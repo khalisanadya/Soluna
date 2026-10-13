@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SOLUNA
 
-## Getting Started
+Platform web untuk pengelola desa dan petugas teknis: menilai baterai bekas kendaraan listrik, merencanakan sistem surya + baterai, mensimulasikan ketahanan energi desa saat cuaca buruk, memeriksa kompatibilitas, dan memantau siklus hidup baterai.
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+Next.js (React, TypeScript, Tailwind)  ──►  FastAPI (Python)  ──►  Mesin hitung deterministik
+          │                                                         engine/soluna_engine
+          └──── Prisma ──► PostgreSQL
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Angka penting selalu dari mesin hitung Python** (`engine/`). UI tidak menghitung SoH, grade, paket, panel, ketahanan, atau biaya.
+- **Model bahasa hanya menjelaskan** hasil. Setiap angka di penjelasan dicek otomatis terhadap JSON hasil; bila gagal, dipakai template.
+- **Konfigurasi terpisah dan berversi** (tabel `Konfigurasi`). Setiap hasil menyimpan versi konfigurasi dan versi model.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Menjalankan
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Prasyarat: Node 22+, Python 3.11+, PostgreSQL.
 
-## Learn More
+```bash
+npm install
+python -m venv engine/.venv
+engine/.venv/Scripts/python -m pip install -r engine/requirements.txt   # macOS/Linux: engine/.venv/bin/python
 
-To learn more about Next.js, take a look at the following resources:
+# .env
+DATABASE_URL="postgresql://postgres:<sandi>@localhost:5432/soluna?schema=public"
+SESSION_SECRET="<string acak panjang>"
+ENGINE_URL="http://127.0.0.1:8000"
+# opsional: ADMIN_INVITE_CODE (wajibkan kode saat daftar admin), SOLUNA_LLM_ENDPOINT (model bahasa penjelasan)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+npm run db:migrate          # buat tabel
+npm run engine              # terminal 1: mesin hitung FastAPI di :8000
+npm run db:seed             # data demo (perlu mesin hitung berjalan)
+npm run dev                 # terminal 2: aplikasi web di :3000
+# atau keduanya sekaligus: npm run dev:all
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Akun demo (ilustrasi): `admin` / `soluna123` (admin), `armada` / `soluna123` (pemasok).
 
-## Deploy on Vercel
+## Uji penerimaan
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run test:engine
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Menjalankan test case proposal (bagian 6.1, toleransi ±5%): kebutuhan malam ≈ 33 kWh, kapasitas terpakai 28 kWh, 2 paket siklus harian, ≈ 4 paket dengan cadangan, ≈ 17 kWp, ketahanan ≈ 2 hari (beban penuh) dan ≈ 4 hari (beban 50%), grade B. Hasil yang sama juga tampil langsung di halaman **Pengaturan → Uji penerimaan**.
+
+## Peta modul
+
+| Modul | Halaman | Mesin hitung |
+| --- | --- | --- |
+| Akun & peran (AKN) | `/masuk`, `/daftar`, `proxy.ts` | – |
+| Pemasok (PSK, ADM) | `/pemasok`, `/profil`, `/baterai` | – |
+| A. Penilaian baterai | `/penilaian/baru`, `/penilaian/[id]` (paspor) | `assessment.py` |
+| B1. Perencana desa | `/perencana`, `/perencana/[id]` | `planner.py` |
+| B2. Ketahanan desa | `/ketahanan` | `resilience.py` |
+| C. Kompatibilitas | `/kompatibilitas` | `compatibility.py` |
+| D. Siklus hidup | `/siklus-hidup` | `lifecycle.py` |
+| Penjelasan (AI) | kartu "Penjelasan sederhana" | `explain.py` |
+| Konfigurasi (SYS-1) | `/pengaturan` | `default_config.json` |
+
+## Catatan batasan
+
+- Rentang sisa umur memakai **model empiris sementara** (`sisa-umur-empiris-0.1`), bukan model ML terlatih. Pelatihan model berada di luar lingkup; antarmukanya dapat diganti model hasil pelatihan.
+- Model bahasa fine-tune belum terpasang; penjelasan memakai template. Pasang `SOLUNA_LLM_ENDPOINT` (POST `{prompt}` → `{text}`) untuk memakai model; teksnya tetap melewati cek angka.
+- Semua angka contoh, harga, dan data seed adalah **ilustrasi** dan perlu dikalibrasi dengan data desa sebenarnya.
+- Hasil bersifat indikatif dan tidak menggantikan pemeriksaan teknis, sertifikasi, atau jaminan keselamatan.

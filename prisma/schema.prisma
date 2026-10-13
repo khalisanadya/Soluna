@@ -6,3 +6,203 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// AKN-1: satu tabel pengguna dengan kolom peran.
+enum Peran {
+  ADMIN
+  PEMASOK
+}
+
+enum StatusPenilaian {
+  BELUM_DINILAI
+  DINILAI
+}
+
+enum JenisBerkas {
+  FOTO
+  DOKUMEN
+}
+
+enum SumberBacaan {
+  PENILAIAN
+  MANUAL
+}
+
+model User {
+  id           String   @id @default(cuid())
+  nama         String
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  peran        Peran
+  createdAt    DateTime @default(now())
+
+  pemasok     Pemasok?
+  penilaian   Penilaian[]
+  rencana     RencanaDesa[]
+  simulasi    SimulasiKetahanan[]
+  bacaanSoh   BacaanSoh[]
+  konfigurasi Konfigurasi[]
+}
+
+model Pemasok {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  namaPenanggungJawab String
+  namaPerusahaan     String
+  alamat             String
+  kota               String
+  provinsi           String
+  telepon            String
+  emailPerusahaan    String
+  deskripsi          String?
+  jenisBaterai       String?
+  // PSK-2: lokasi penyimpanan bila berbeda dari alamat perusahaan
+  alamatPenyimpanan  String?
+  kotaPenyimpanan    String?
+  provinsiPenyimpanan String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  baterai Baterai[]
+}
+
+model Baterai {
+  id               String          @id @default(cuid())
+  kode             String          @unique
+  pemasokId        String
+  pemasok          Pemasok         @relation(fields: [pemasokId], references: [id], onDelete: Cascade)
+  jenisKimia       String
+  merek            String
+  model            String
+  kapasitasAwalKwh Float
+  usiaTahun        Float?
+  kondisi          String
+  teganganNominalV Float?
+  jumlahSiklus     Int?
+  catatan          String?
+  status           StatusPenilaian @default(BELUM_DINILAI)
+  sohTerakhir      Float?
+  gradeTerakhir    String?
+  ilustrasi        Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  berkas    BerkasBaterai[]
+  penilaian Penilaian[]
+  bacaanSoh BacaanSoh[]
+  cekKompat CekKompatibilitas[]
+
+  @@index([pemasokId])
+}
+
+model BerkasBaterai {
+  id         String      @id @default(cuid())
+  bateraiId  String
+  baterai    Baterai     @relation(fields: [bateraiId], references: [id], onDelete: Cascade)
+  jenis      JenisBerkas
+  namaBerkas String
+  mimeType   String
+  ukuran     Int
+  lokasi     String
+  createdAt  DateTime    @default(now())
+}
+
+model Penilaian {
+  id            String   @id @default(cuid())
+  bateraiId     String
+  baterai       Baterai  @relation(fields: [bateraiId], references: [id], onDelete: Cascade)
+  penilaiId     String
+  penilai       User     @relation(fields: [penilaiId], references: [id])
+  masukan       Json
+  hasil         Json
+  soh           Float
+  grade         String
+  keputusan     String
+  sisaUmurBawah Float
+  sisaUmurTengah Float
+  sisaUmurAtas  Float
+  keyakinan     Float
+  tanggalGanti  DateTime?
+  penjelasan    Json?
+  // NF-8: setiap hasil mencatat versi konfigurasi dan versi model
+  versiKonfigurasi Int
+  versiModel    String
+  createdAt     DateTime @default(now())
+
+  @@index([bateraiId, createdAt])
+}
+
+model BacaanSoh {
+  id        String       @id @default(cuid())
+  bateraiId String
+  baterai   Baterai      @relation(fields: [bateraiId], references: [id], onDelete: Cascade)
+  soh       Float
+  tanggal   DateTime
+  sumber    SumberBacaan
+  catatan   String?
+  dibuatId  String?
+  dibuatOleh User?       @relation(fields: [dibuatId], references: [id])
+  createdAt DateTime     @default(now())
+
+  @@index([bateraiId, tanggal])
+}
+
+model RencanaDesa {
+  id               String   @id @default(cuid())
+  nama             String
+  namaDesa         String
+  masukan          Json
+  hasil            Json
+  penjelasan       Json?
+  bateraiIds       String[]
+  versiKonfigurasi Int
+  versiModel       String
+  ilustrasi        Boolean  @default(false)
+  dibuatId         String
+  dibuatOleh       User     @relation(fields: [dibuatId], references: [id])
+  createdAt        DateTime @default(now())
+
+  simulasi  SimulasiKetahanan[]
+  cekKompat CekKompatibilitas[]
+}
+
+model SimulasiKetahanan {
+  id               String       @id @default(cuid())
+  nama             String
+  rencanaId        String?
+  rencana          RencanaDesa? @relation(fields: [rencanaId], references: [id], onDelete: SetNull)
+  masukan          Json
+  hasil            Json
+  versiKonfigurasi Int
+  versiModel       String
+  dibuatId         String
+  dibuatOleh       User         @relation(fields: [dibuatId], references: [id])
+  createdAt        DateTime     @default(now())
+}
+
+model CekKompatibilitas {
+  id               String       @id @default(cuid())
+  bateraiId        String?
+  baterai          Baterai?     @relation(fields: [bateraiId], references: [id], onDelete: SetNull)
+  rencanaId        String?
+  rencana          RencanaDesa? @relation(fields: [rencanaId], references: [id], onDelete: SetNull)
+  masukan          Json
+  hasil            Json
+  status           String
+  versiKonfigurasi Int
+  createdAt        DateTime     @default(now())
+}
+
+// SYS-1: parameter terpisah dari logika hitung, berversi.
+model Konfigurasi {
+  id        String   @id @default(cuid())
+  versi     Int      @unique
+  data      Json
+  catatan   String?
+  aktif     Boolean  @default(false)
+  dibuatId  String?
+  dibuatOleh User?   @relation(fields: [dibuatId], references: [id])
+  createdAt DateTime @default(now())
+}

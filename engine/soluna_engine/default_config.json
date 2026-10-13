@@ -1,0 +1,109 @@
+{
+  "_catatan": "Nilai bawaan SOLUNA. Semua angka adalah ilustrasi awal dan dikalibrasi dengan data desa sebenarnya.",
+  "grade": {
+    "A": 80,
+    "B": 70,
+    "C": 60
+  },
+  "keputusan": {
+    "A": "Dipakai ulang langsung",
+    "B": "Dipakai pada tingkat modul",
+    "C": "Dipakai pada tingkat sel",
+    "D": "Didaur ulang"
+  },
+  "profil_paket": {
+    "nama": "Paket bawaan 50 kWh (ilustrasi)",
+    "kapasitas_kwh": 50,
+    "soh": 0.7,
+    "tegangan_nominal_v": 48,
+    "c_rate_maks": 0.5,
+    "harga_per_kwh_rendah": 1500000,
+    "harga_per_kwh_tinggi": 2500000
+  },
+  "surya": {
+    "psh_jam": 4,
+    "pr": 0.75,
+    "kapasitas_per_panel_wp": 550,
+    "harga_per_kwp_rendah": 9000000,
+    "harga_per_kwp_tinggi": 13000000
+  },
+  "lokasi_psh": {
+    "Nusa Tenggara Timur": 5.2,
+    "Nusa Tenggara Barat": 5.0,
+    "Jawa": 4.5,
+    "Sumatera": 4.2,
+    "Kalimantan": 4.3,
+    "Sulawesi": 4.6,
+    "Maluku": 4.8,
+    "Papua": 4.0,
+    "Bawaan": 4.0
+  },
+  "efisiensi": 0.9,
+  "dod": 0.8,
+  "dod_prioritas": {
+    "hemat_diesel": 0.8,
+    "ketahanan_maksimum": 0.9,
+    "umur_baterai_maksimum": 0.6
+  },
+  "dod_pengurangan_soh_rendah": 0.1,
+  "ambang_soh_rendah": 70,
+  "hari_cadangan": 1,
+  "faktor_beban_puncak": 3,
+  "faktor_keamanan_inverter": 1.25,
+  "ukuran_inverter_kw": [3, 5, 8, 10, 15, 20, 30, 50, 75, 100],
+  "harga_inverter_per_kw": 2500000,
+  "biaya_lain_persen": 0.15,
+  "umur_sistem_tahun": 8,
+  "perawatan_persen_per_tahun": 0.02,
+  "diesel": {
+    "kwh_per_liter": 3,
+    "faktor_emisi_kg_per_liter": 2.68,
+    "harga_per_liter_rendah": 6800,
+    "harga_per_liter_tinggi": 12000,
+    "daya_genset_kw": 10
+  },
+  "skenario_cuaca": {
+    "normal": { "label": "Normal", "faktor": 1.0 },
+    "mendung_panjang": { "label": "Mendung panjang", "faktor": 0.4 },
+    "hujan_beberapa_hari": { "label": "Hujan beberapa hari", "faktor": 0.0 }
+  },
+  "periode_simulasi_hari": 3,
+  "tingkat_beban": {
+    "kritis": {
+      "label": "Kritis",
+      "porsi": 0.3,
+      "perangkat": ["Pendingin obat", "Penerangan", "Komunikasi"],
+      "penjelasan": "Beban yang menyangkut kesehatan dan keselamatan. Selalu dijaga menyala sampai baterai benar-benar habis."
+    },
+    "penting": {
+      "label": "Penting",
+      "porsi": 0.3,
+      "perangkat": ["Pompa air", "Pengisian daya"],
+      "penjelasan": "Beban yang menunjang kebutuhan harian. Dilepas kedua bila cadangan sangat menipis."
+    },
+    "kenyamanan": {
+      "label": "Kenyamanan",
+      "porsi": 0.4,
+      "perangkat": ["Televisi", "Kipas angin"],
+      "penjelasan": "Beban yang bisa ditunda tanpa membahayakan warga. Dilepas pertama saat cadangan menipis."
+    }
+  },
+  "ambang_pelepasan": {
+    "kenyamanan": 0.5,
+    "penting": 0.25
+  },
+  "siklus_hidup": {
+    "ambang_penggantian_soh": 60,
+    "margin_peringatan_soh": 5,
+    "batas_sisa_umur_tahun": 1
+  },
+  "kompatibilitas": {
+    "toleransi_nominal_persen": 5
+  },
+  "model_sisa_umur": {
+    "laju_minimum_per_tahun": 1.5,
+    "faktor_pemakaian_stasioner": 0.7,
+    "faktor_kimia": { "LFP": 0.7, "NMC": 1.0, "NCA": 1.1, "LMO": 1.2, "Lainnya": 1.0 },
+    "laju_bawaan_per_tahun": 4.0
+  }
+}

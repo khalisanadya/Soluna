@@ -1,26 +1,144 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+  SOLUNA DESIGN SYSTEM
+  - Primary "sun": oranye logo SOLUNA (#FA9104) — aksi utama, energi surya.
+  - Neutral "ink": teks dan permukaan gelap (kartu sorotan, navigasi aktif).
+  - Secondary "leaf": baterai, keberlanjutan, status sehat.
+  - Canvas hangat + surface putih, radius besar, bayangan lembut.
+  Warna sumber energi konsisten di seluruh aplikasi: surya = sun, baterai = leaf,
+  genset = flame, desa/beban = ink.
+*/
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-sun-50: #fff7eb;
+  --color-sun-100: #ffecd0;
+  --color-sun-200: #ffd59c;
+  --color-sun-300: #ffbb5e;
+  --color-sun-400: #fda22c;
+  --color-sun-500: #fa9104;
+  --color-sun-600: #d97700;
+  --color-sun-700: #b05d04;
+  --color-sun-800: #8a490a;
+  --color-sun-900: #5e330a;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --color-ink-50: #f7f7f5;
+  --color-ink-100: #efeeea;
+  --color-ink-200: #e2e0da;
+  --color-ink-300: #c9c6be;
+  --color-ink-400: #a19d93;
+  --color-ink-500: #7a766c;
+  --color-ink-600: #5b5850;
+  --color-ink-700: #3f3d38;
+  --color-ink-800: #2a2926;
+  --color-ink-900: #1c1b19;
+  --color-ink-950: #121210;
+
+  --color-leaf-50: #ebf8f1;
+  --color-leaf-100: #cfeedd;
+  --color-leaf-200: #a2dcbf;
+  --color-leaf-300: #6cc59d;
+  --color-leaf-400: #3aab7c;
+  --color-leaf-500: #1f9165;
+  --color-leaf-600: #157652;
+  --color-leaf-700: #135e43;
+
+  --color-flame-50: #fdf0ed;
+  --color-flame-100: #fbdcd4;
+  --color-flame-500: #d9533b;
+  --color-flame-600: #b8402b;
+
+  --color-sky-50: #edf4fe;
+  --color-sky-100: #d6e6fd;
+  --color-sky-500: #2f6fde;
+  --color-sky-600: #2459b8;
+
+  --color-amber-50: #fdf8e4;
+  --color-amber-100: #f9edbb;
+  --color-amber-500: #c99a06;
+  --color-amber-600: #a27b03;
+
+  --color-canvas: #f5f4ef;
+  --color-surface: #ffffff;
+
+  --radius-card: 1.5rem;
+  --shadow-soft: 0 1px 2px rgb(28 27 25 / 0.04), 0 8px 24px -12px rgb(28 27 25 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(28 27 25 / 0.05), 0 18px 40px -18px rgb(28 27 25 / 0.25);
+
+  --animate-flow: flow 1.6s linear infinite;
+  --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
+  --animate-rise: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  @keyframes flow {
+    to {
+      stroke-dashoffset: -24;
+    }
+  }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01";
+  }
+  ::selection {
+    background: var(--color-sun-200);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-sun-500);
+    outline-offset: 2px;
+  }
+  input[type="number"]::-webkit-inner-spin-button {
+    opacity: 0.4;
+  }
+}
+
+@layer components {
+  /* Angka: sans dengan digit tabular agar kolom angka sejajar; mono hanya untuk rumus. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-ink-500);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
