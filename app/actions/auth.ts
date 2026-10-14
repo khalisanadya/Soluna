@@ -1,26 +1,41 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { SAMBUTAN_COOKIE } from "@/lib/flash";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { createSession, deleteSession } from "@/lib/session";
-import { akunSchema, formValues, pick, profilPemasokSchema, type FormState } from "@/lib/validation";
+import { akunSchema, formValues, loginSchema, pick, profilPemasokSchema, type FormState } from "@/lib/validation";
 
 export async function login(_prev: FormState, fd: FormData): Promise<FormState> {
-  const identitas = String(fd.get("identitas") ?? "").trim().toLowerCase();
-  const password = String(fd.get("password") ?? "");
-  if (!identitas || !password) {
-    return { message: "Isi nama pengguna atau email, dan kata sandi.", values: formValues(fd) };
+  // Validasi server tetap berjalan walau klien sudah memeriksa formulir.
+  const parsed = loginSchema.safeParse({ email: fd.get("email") ?? undefined, password: fd.get("password") ?? undefined });
+  if (!parsed.success) {
+    return { errors: z.flattenError(parsed.error).fieldErrors, message: "Periksa kembali email dan kata sandi.", values: formValues(fd) };
   }
-  const user = await prisma.user.findFirst({
-    where: { OR: [{ username: { equals: identitas, mode: "insensitive" } }, { email: identitas }] },
-  });
+  const { email, password } = parsed.data;
+  const user = await prisma.user.findUnique({ where: { email } });
+  // Pesan sama untuk email tak terdaftar dan kata sandi salah agar tidak membocorkan akun yang ada.
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    return { message: "Nama pengguna atau kata sandi salah.", values: formValues(fd) };
+    return { message: "Email atau kata sandi salah. Periksa kembali lalu coba lagi.", values: { email } };
   }
   await createSession(user.id, user.peran);
-  redirect("/dashboard");
+  await setSambutan("masuk");
+  redirect(safeNext(fd.get("lanjut")));
+}
+
+/** Pop-up sambutan sekali tampil setelah masuk/daftar (dibaca dan dihapus oleh WelcomeDialog di klien). */
+async function setSambutan(jenis: "masuk" | "baru") {
+  (await cookies()).set(SAMBUTAN_COOKIE, jenis, { path: "/", maxAge: 60, sameSite: "lax" });
+}
+
+/** Hanya path internal ("/x"), bukan "//domain" atau URL penuh, untuk mencegah open redirect. */
+function safeNext(value: FormDataEntryValue | null): string {
+  const path = typeof value === "string" ? value : "";
+  return path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\") ? path : "/dashboard";
 }
 
 export async function logout() {
@@ -32,7 +47,8 @@ export async function register(_prev: FormState, fd: FormData): Promise<FormStat
   const peran = fd.get("peran") === "ADMIN" ? "ADMIN" : "PEMASOK";
   const values = formValues(fd);
 
-  const akun = akunSchema.safeParse(pick(fd, ["username", "password", "email"]));
+  // Kata sandi tidak melalui pick() agar tidak di-trim atau diubah (mis. "12,5" → "12.5").
+  const akun = akunSchema.safeParse({ ...pick(fd, ["username", "email"]), password: fd.get("password") ?? undefined });
   const errors: Record<string, string[]> = {};
   if (!akun.success) Object.assign(errors, z.flattenError(akun.error).fieldErrors);
   if (fd.get("password") !== fd.get("konfirmasi")) errors.konfirmasi = ["Konfirmasi kata sandi tidak sama."];
@@ -78,22 +94,35 @@ export async function register(_prev: FormState, fd: FormData): Promise<FormStat
   if (exists) {
     return {
       values,
-      errors: exists.email === email ? { email: ["Email sudah terdaftar."] } : { username: ["Nama pengguna sudah dipakai."] },
-      message: "Akun sudah ada.",
+      errors:
+        exists.email === email
+          ? { email: ["Email ini sudah terdaftar. Silakan masuk dengan akun tersebut."] }
+          : { username: ["Nama pengguna sudah dipakai. Coba nama lain."] },
+      message: exists.email === email ? "Email sudah terdaftar." : "Nama pengguna sudah dipakai.",
     };
   }
 
   const passwordHash = await hashPassword(password);
-  const user = await prisma.user.create({
-    data: {
-      username,
-      email,
-      passwordHash,
-      peran,
-      nama: profil ? profil.namaPenanggungJawab : namaAdmin,
-      ...(profil ? { pemasok: { create: profil } } : {}),
-    },
-  });
+  let user;
+  try {
+    user = await prisma.user.create({
+      data: {
+        username,
+        email,
+        passwordHash,
+        peran,
+        nama: profil ? profil.namaPenanggungJawab : namaAdmin,
+        ...(profil ? { pemasok: { create: profil } } : {}),
+      },
+    });
+  } catch (err) {
+    // Batasan unik di database tetap menjadi penjaga terakhir bila dua pendaftaran berlangsung bersamaan.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return { values, errors: { email: ["Email atau nama pengguna sudah terdaftar."] }, message: "Akun sudah ada." };
+    }
+    throw err;
+  }
   await createSession(user.id, user.peran);
+  await setSambutan("baru");
   redirect("/dashboard");
 }

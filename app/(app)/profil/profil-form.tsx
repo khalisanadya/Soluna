@@ -1,31 +1,44 @@
 "use client";
 
-import { useActionState } from "react";
+import { startTransition, useActionState, useState } from "react";
+import { LoaderCircle } from "lucide-react";
 import { updateProfil } from "@/app/actions/profil";
-import { SubmitButton } from "@/components/submit-button";
-import { Card, Field, Notice, inputClass, textareaClass } from "@/components/ui";
-import { PROVINSI } from "@/lib/wilayah";
+import { RegionSelect, guardAction, useFocusServerError } from "@/components/form-kit";
+import { Card, Field, Notice, buttonClass, inputClass, textareaClass } from "@/components/ui";
+import { cocokkanKabupatenKota } from "@/lib/wilayah";
+
+const guardedUpdate = guardAction(updateProfil);
+const URUTAN = ["namaPerusahaan", "namaPenanggungJawab", "alamat", "provinsi", "kota", "alamatPenyimpanan", "provinsiPenyimpanan", "kotaPenyimpanan", "telepon", "emailPerusahaan"];
 
 export function ProfilForm({ initial }: { initial: Record<string, string> }) {
-  const [state, action] = useActionState(updateProfil, undefined);
+  const [state, action, pending] = useActionState(guardedUpdate, undefined);
   const v = { ...initial, ...state?.values };
   const e = state?.errors ?? {};
+  useFocusServerError(state, URUTAN);
+  // Wilayah dikendalikan agar kabupaten/kota selalu mengikuti provinsi terpilih.
+  // Nama kota lama ("Surabaya") dicocokkan ke nama resmi ("Kota Surabaya") bila tidak ambigu.
+  const [wilayah, setWilayah] = useState(() => ({
+    provinsi: initial.provinsi ?? "",
+    kota: cocokkanKabupatenKota(initial.provinsi, initial.kota),
+    provinsiPenyimpanan: initial.provinsiPenyimpanan ?? "",
+    kotaPenyimpanan: cocokkanKabupatenKota(initial.provinsiPenyimpanan, initial.kotaPenyimpanan),
+  }));
+  const setW = (k: keyof typeof wilayah) => (value: string) => setWilayah((w) => ({ ...w, [k]: value }));
   const input = (name: string, props: React.ComponentProps<"input"> = {}) => (
     <input id={name} name={name} defaultValue={v[name]} aria-invalid={Boolean(e[name])} className={inputClass} {...props} />
   );
-  const provSelect = (name: string, required: boolean) => (
-    <select id={name} name={name} defaultValue={v[name] ?? ""} className={inputClass} aria-invalid={Boolean(e[name])}>
-      <option value="" disabled={required}>
-        {required ? "Pilih provinsi" : "—"}
-      </option>
-      {PROVINSI.map((p) => (
-        <option key={p}>{p}</option>
-      ))}
-    </select>
-  );
 
   return (
-    <form action={action} className="grid gap-4 lg:grid-cols-3" noValidate>
+    <form
+      onSubmit={(ev) => {
+        ev.preventDefault();
+        if (pending) return;
+        const fd = new FormData(ev.currentTarget);
+        startTransition(() => action(fd));
+      }}
+      className="grid gap-4 lg:grid-cols-3"
+      noValidate
+    >
       <div className="space-y-4 lg:col-span-2">
         {state?.message && <Notice tone={state.ok ? "success" : "danger"}>{state.message}</Notice>}
         <Card>
@@ -40,12 +53,17 @@ export function ProfilForm({ initial }: { initial: Record<string, string> }) {
             <Field label="Alamat" htmlFor="alamat" error={e.alamat} className="sm:col-span-2">
               {input("alamat")}
             </Field>
-            <Field label="Kota/kabupaten" htmlFor="kota" error={e.kota}>
-              {input("kota")}
-            </Field>
-            <Field label="Provinsi" htmlFor="provinsi" error={e.provinsi}>
-              {provSelect("provinsi", true)}
-            </Field>
+            <RegionSelect
+              provinsiName="provinsi"
+              kotaName="kota"
+              provinsi={wilayah.provinsi}
+              kota={wilayah.kota}
+              onProvinsi={setW("provinsi")}
+              onKota={setW("kota")}
+              provinsiError={e.provinsi?.[0]}
+              kotaError={e.kota?.[0]}
+              required
+            />
             <Field label="Jenis baterai yang ditawarkan" htmlFor="jenisBaterai" optional hint="Mis. LFP, NMC">
               {input("jenisBaterai")}
             </Field>
@@ -61,12 +79,16 @@ export function ProfilForm({ initial }: { initial: Record<string, string> }) {
             <Field label="Alamat penyimpanan" htmlFor="alamatPenyimpanan" optional className="sm:col-span-2">
               {input("alamatPenyimpanan")}
             </Field>
-            <Field label="Kota/kabupaten" htmlFor="kotaPenyimpanan" optional>
-              {input("kotaPenyimpanan")}
-            </Field>
-            <Field label="Provinsi" htmlFor="provinsiPenyimpanan" optional error={e.provinsiPenyimpanan}>
-              {provSelect("provinsiPenyimpanan", false)}
-            </Field>
+            <RegionSelect
+              provinsiName="provinsiPenyimpanan"
+              kotaName="kotaPenyimpanan"
+              provinsi={wilayah.provinsiPenyimpanan}
+              kota={wilayah.kotaPenyimpanan}
+              onProvinsi={setW("provinsiPenyimpanan")}
+              onKota={setW("kotaPenyimpanan")}
+              provinsiError={e.provinsiPenyimpanan?.[0]}
+              kotaError={e.kotaPenyimpanan?.[0]}
+            />
           </div>
         </Card>
       </div>
@@ -82,9 +104,10 @@ export function ProfilForm({ initial }: { initial: Record<string, string> }) {
             </Field>
           </div>
         </Card>
-        <SubmitButton className="w-full" pendingText="Menyimpan…">
-          Simpan profil
-        </SubmitButton>
+        <button type="submit" disabled={pending} aria-busy={pending} className={buttonClass("primary", "md", "w-full")}>
+          {pending && <LoaderCircle className="size-4 animate-spin" />}
+          {pending ? "Menyimpan…" : "Simpan profil"}
+        </button>
       </div>
     </form>
   );

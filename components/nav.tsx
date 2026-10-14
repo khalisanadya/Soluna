@@ -21,8 +21,8 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { logout } from "@/app/actions/auth";
 import { cn } from "@/lib/format";
+import { LogoutButton, WelcomeDialog } from "./session-dialogs";
 import { Logo } from "./ui";
 
 type Item = { href: string; label: string; short?: string; icon: React.ComponentType<{ className?: string }> };
@@ -96,6 +96,7 @@ export function AppNav({ user }: { user: NavUser }) {
 
   return (
     <>
+      <WelcomeDialog nama={user.nama} peran={user.peran} />
       {/* Desktop: sidebar berlabel */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden print:!hidden w-64 flex-col border-r border-ink-200/70 bg-canvas px-4 py-5 lg:flex">
         <Link href="/dashboard" className="px-2">
@@ -134,11 +135,9 @@ export function AppNav({ user }: { user: NavUser }) {
             <span className="block truncate text-sm font-semibold">{user.nama}</span>
             <span className="block truncate text-xs text-ink-500">{user.sub}</span>
           </span>
-          <form action={logout}>
-            <button className="grid size-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-ink-900" aria-label="Keluar" title="Keluar">
-              <LogOut className="size-4" />
-            </button>
-          </form>
+          <LogoutButton className="grid size-8 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-ink-900">
+            <LogOut className="size-4" />
+          </LogoutButton>
         </div>
       </aside>
 
@@ -166,11 +165,9 @@ export function AppNav({ user }: { user: NavUser }) {
             );
           })}
         </nav>
-        <form action={logout}>
-          <button className="grid size-10 place-items-center rounded-xl text-ink-500 hover:bg-ink-100" aria-label="Keluar" title="Keluar">
-            <LogOut className="size-5" />
-          </button>
-        </form>
+        <LogoutButton className="grid size-10 place-items-center rounded-xl text-ink-500 hover:bg-ink-100">
+          <LogOut className="size-5" />
+        </LogoutButton>
       </aside>
 
       {/* Ponsel: bilah atas + tab bawah */}
@@ -234,11 +231,9 @@ export function AppNav({ user }: { user: NavUser }) {
                 </Link>
               ))}
             </div>
-            <form action={logout} className="mt-4">
-              <button className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-ink-100 text-sm font-semibold text-ink-800">
-                <LogOut className="size-4" /> Keluar
-              </button>
-            </form>
+            <LogoutButton className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-ink-100 text-sm font-semibold text-ink-800">
+              <LogOut className="size-4" /> Keluar
+            </LogoutButton>
           </div>
         </div>
       )}

@@ -1,12 +1,36 @@
 import { z } from "zod";
-import { JENIS_KIMIA, PROVINSI } from "./wilayah";
+import { JENIS_KIMIA, PROVINSI, isKabupatenKotaDi } from "./wilayah";
 
-const wajib = (label: string) => z.string(`${label} wajib diisi.`).trim().min(1, `${label} wajib diisi.`);
-const telepon = z
-  .string("Telepon wajib diisi.")
+// Skema per kolom diekspor agar formulir di klien memakai aturan yang persis sama dengan server.
+export const wajib = (label: string) => z.string(`${label} wajib diisi.`).trim().min(1, `${label} wajib diisi.`);
+
+/** Nomor Indonesia: diawali 0, 62, atau +62, lalu 8–13 digit. Spasi dan tanda hubung diabaikan. */
+export const teleponSchema = z
+  .string("Nomor telepon wajib diisi.")
   .trim()
+  .min(1, "Nomor telepon wajib diisi.")
   .transform((s) => s.replace(/[\s-]/g, ""))
-  .pipe(z.string().regex(/^(\+?62|0)\d{8,13}$/, "Format telepon tidak valid. Contoh: 081234567890 atau 021-5551234."));
+  .pipe(z.string().regex(/^(\+?62|0)\d{8,13}$/, "Nomor telepon tidak valid. Gunakan format Indonesia, mis. 081234567890 atau +6281234567890."));
+
+/** Email dirapikan (trim + huruf kecil) sebelum diperiksa formatnya, agar konsisten saat disimpan dan dicari. */
+export const emailSchema = z
+  .string("Alamat email wajib diisi.")
+  .trim()
+  .toLowerCase()
+  .min(1, "Alamat email wajib diisi.")
+  .pipe(z.email("Format email tidak valid. Contoh: nama@email.com"));
+
+export const PASSWORD_MIN = 8;
+export const passwordSchema = z
+  .string("Kata sandi wajib diisi.")
+  .min(1, "Kata sandi wajib diisi.")
+  .min(PASSWORD_MIN, `Kata sandi minimal ${PASSWORD_MIN} karakter.`);
+
+export const usernameSchema = z
+  .string("Nama pengguna wajib diisi.")
+  .trim()
+  .min(1, "Nama pengguna wajib diisi.");
+
 const opsional = z
   .string()
   .trim()
@@ -14,34 +38,50 @@ const opsional = z
   .optional();
 
 export const akunSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .min(3, "Nama pengguna minimal 3 karakter.")
-    .max(32, "Nama pengguna maksimal 32 karakter.")
-    .regex(/^[a-z0-9._-]+$/i, "Gunakan huruf, angka, titik, garis bawah, atau tanda hubung."),
-  password: z.string().min(8, "Kata sandi minimal 8 karakter."),
-  email: z.email("Format email tidak valid.").trim().toLowerCase(),
+  username: usernameSchema,
+  password: passwordSchema,
+  email: emailSchema,
 });
 
-export const profilPemasokSchema = z.object({
-  namaPenanggungJawab: wajib("Nama penanggung jawab"),
-  namaPerusahaan: wajib("Nama perusahaan"),
-  alamat: wajib("Alamat"),
-  kota: wajib("Kota/kabupaten"),
-  provinsi: z.enum(PROVINSI, "Pilih provinsi."),
-  telepon,
-  emailPerusahaan: z.email("Format email tidak valid.").trim().toLowerCase(),
-  deskripsi: opsional,
-  jenisBaterai: opsional,
-  alamatPenyimpanan: opsional,
-  kotaPenyimpanan: opsional,
-  provinsiPenyimpanan: z
-    .string()
-    .transform((s) => (s === "" ? undefined : s))
-    .pipe(z.enum(PROVINSI).optional())
-    .optional(),
+export const loginSchema = z.object({
+  email: emailSchema,
+  password: z.string("Kata sandi wajib diisi.").min(1, "Kata sandi wajib diisi."),
 });
+
+export const profilPemasokSchema = z
+  .object({
+    namaPenanggungJawab: wajib("Nama penanggung jawab"),
+    namaPerusahaan: wajib("Nama perusahaan"),
+    alamat: wajib("Alamat lengkap"),
+    kota: wajib("Kabupaten/kota"),
+    provinsi: z.enum(PROVINSI, "Pilih provinsi."),
+    telepon: teleponSchema,
+    emailPerusahaan: emailSchema,
+    deskripsi: opsional,
+    jenisBaterai: opsional,
+    alamatPenyimpanan: opsional,
+    kotaPenyimpanan: opsional,
+    provinsiPenyimpanan: z
+      .string()
+      .transform((s) => (s === "" ? undefined : s))
+      .pipe(z.enum(PROVINSI).optional())
+      .optional(),
+  })
+  // Kabupaten/kota harus benar-benar berada di provinsi yang dipilih.
+  .superRefine((d, ctx) => {
+    if (d.kota && !isKabupatenKotaDi(d.provinsi, d.kota)) {
+      ctx.addIssue({ code: "custom", path: ["kota"], message: "Pilih kabupaten/kota dari daftar provinsi yang dipilih." });
+    }
+    if (d.provinsiPenyimpanan && !d.kotaPenyimpanan) {
+      ctx.addIssue({ code: "custom", path: ["kotaPenyimpanan"], message: "Pilih kabupaten/kota lokasi penyimpanan." });
+    } else if (d.kotaPenyimpanan && !isKabupatenKotaDi(d.provinsiPenyimpanan, d.kotaPenyimpanan)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [d.provinsiPenyimpanan ? "kotaPenyimpanan" : "provinsiPenyimpanan"],
+        message: d.provinsiPenyimpanan ? "Pilih kabupaten/kota dari daftar provinsi yang dipilih." : "Pilih provinsi lokasi penyimpanan.",
+      });
+    }
+  });
 
 export const bateraiSchema = z.object({
   jenisKimia: z.enum(JENIS_KIMIA, "Pilih jenis kimia."),
@@ -66,7 +106,7 @@ export type FormState = {
 
 export function formValues(fd: FormData): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [k, v] of fd.entries()) if (typeof v === "string" && k !== "password" && !k.startsWith("$")) out[k] = v;
+  for (const [k, v] of fd.entries()) if (typeof v === "string" && k !== "password" && k !== "konfirmasi" && !k.startsWith("$")) out[k] = v;
   return out;
 }
 

@@ -74,13 +74,13 @@ async function main() {
       p: {
         namaPerusahaan: "PT Armada Listrik Nusantara (ilustrasi)",
         alamat: "Jl. Pemuda No. 12",
-        kota: "Jakarta Timur",
+        kota: "Kota Administrasi Jakarta Timur",
         provinsi: "DKI Jakarta",
         telepon: "0215550123",
         deskripsi: "Operator armada bus dan taksi listrik. Menyalurkan paket baterai pensiun setelah 5–7 tahun operasi.",
         jenisBaterai: "LFP, NMC",
         alamatPenyimpanan: "Gudang Kawasan Industri Jababeka Blok C-7",
-        kotaPenyimpanan: "Bekasi",
+        kotaPenyimpanan: "Kota Bekasi",
         provinsiPenyimpanan: "Jawa Barat",
       },
     },
@@ -91,7 +91,7 @@ async function main() {
       p: {
         namaPerusahaan: "Bengkel EV Mandiri (ilustrasi)",
         alamat: "Jl. Raya Darmo No. 88",
-        kota: "Surabaya",
+        kota: "Kota Surabaya",
         provinsi: "Jawa Timur",
         telepon: "081234567890",
         deskripsi: "Bengkel servis kendaraan listrik roda empat dan roda dua.",
@@ -105,7 +105,7 @@ async function main() {
       p: {
         namaPerusahaan: "CV Daur Energi Timur (ilustrasi)",
         alamat: "Jl. El Tari No. 3",
-        kota: "Kupang",
+        kota: "Kota Kupang",
         provinsi: "Nusa Tenggara Timur",
         telepon: "082145550987",
         deskripsi: "Pengumpul dan perakit ulang modul baterai untuk wilayah timur Indonesia.",

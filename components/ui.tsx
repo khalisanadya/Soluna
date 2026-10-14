@@ -80,9 +80,9 @@ export function SectionTitle({ title, hint, action }: { title: ReactNode; hint?:
 
 type Variant = "primary" | "secondary" | "dark" | "ghost" | "danger";
 const buttonBase =
-  "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 whitespace-nowrap";
+  "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-[color,background-color,box-shadow,transform] duration-200 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 whitespace-nowrap";
 const variants: Record<Variant, string> = {
-  primary: "bg-sun-500 text-ink-950 hover:bg-sun-400 shadow-[inset_0_-2px_0_rgb(0_0_0/0.08)]",
+  primary: "bg-sun-500 text-ink-950 hover:bg-sun-400 hover:shadow-[0_8px_20px_-8px_rgb(250_145_4/0.6)] shadow-[inset_0_-2px_0_rgb(0_0_0/0.08)]",
   secondary: "bg-surface text-ink-900 ring-1 ring-ink-200 hover:bg-ink-50",
   dark: "bg-ink-900 text-ink-50 hover:bg-ink-800",
   ghost: "text-ink-700 hover:bg-ink-100",
@@ -215,6 +215,7 @@ export function Field({
   error,
   htmlFor,
   optional,
+  required,
   children,
   className,
 }: {
@@ -223,20 +224,41 @@ export function Field({
   error?: string | string[];
   htmlFor?: string;
   optional?: boolean;
+  /** Tampilkan tanda wajib (*) di label. */
+  required?: boolean;
   children: ReactNode;
   className?: string;
 }) {
   const msg = Array.isArray(error) ? error[0] : error;
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor={htmlFor} className="flex items-center gap-2 text-sm font-medium text-ink-800">
+      <label htmlFor={htmlFor} className="flex items-center gap-1.5 text-sm font-medium text-ink-800">
         {label}
+        {required && (
+          <span className="text-flame-500" aria-hidden="true">
+            *
+          </span>
+        )}
         {optional && <span className="text-xs font-normal text-ink-400">opsional</span>}
       </label>
       {children}
-      {msg ? <p className="text-xs font-medium text-flame-600">{msg}</p> : hint ? <p className="text-xs text-ink-500">{hint}</p> : null}
+      {msg ? (
+        <p id={htmlFor ? fieldMessageId(htmlFor) : undefined} className="flex items-start gap-1 text-xs font-medium text-flame-600">
+          <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+          {msg}
+        </p>
+      ) : hint ? (
+        <p id={htmlFor ? fieldMessageId(htmlFor) : undefined} className="text-xs text-ink-500">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
+}
+
+/** id pesan galat/petunjuk sebuah kolom, untuk aria-describedby. */
+export function fieldMessageId(htmlFor: string) {
+  return `${htmlFor}-pesan`;
 }
 
 /* ---------- Status ---------- */

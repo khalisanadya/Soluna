@@ -60,6 +60,15 @@
   --color-amber-500: #c99a06;
   --color-amber-600: #a27b03;
 
+  /* "zest": aksen lime dari referensi desain — sorotan sekunder, bukan aksi utama. */
+  --color-zest-50: #fbfde8;
+  --color-zest-100: #f4fac4;
+  --color-zest-200: #ebf48f;
+  --color-zest-300: #e1ee5e;
+  --color-zest-400: #d2e23a;
+  --color-zest-600: #8a961a;
+  --color-zest-700: #5f6814;
+
   --color-canvas: #f5f4ef;
   --color-surface: #ffffff;
 
@@ -70,6 +79,12 @@
   --animate-flow: flow 1.6s linear infinite;
   --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
   --animate-rise: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-glow: glow 4s ease-in-out infinite;
+  --animate-spin-slow: spin 60s linear infinite;
+  --animate-drift: drift 9s ease-in-out infinite alternate;
+  --animate-glint: glint 3.2s ease-in-out infinite;
+  --animate-rain: rain 0.9s linear infinite;
+  --animate-puff: puff 2.2s ease-out infinite;
 
   @keyframes flow {
     to {
@@ -83,6 +98,58 @@
     }
     50% {
       opacity: 0.55;
+    }
+  }
+  @keyframes glow {
+    0%,
+    100% {
+      opacity: 0.55;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.9;
+      transform: scale(1.08);
+    }
+  }
+  @keyframes drift {
+    from {
+      transform: translateX(-14px);
+    }
+    to {
+      transform: translateX(14px);
+    }
+  }
+  @keyframes glint {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    45%,
+    55% {
+      opacity: 0.55;
+    }
+  }
+  @keyframes rain {
+    from {
+      transform: translate(0, -18px);
+      opacity: 0;
+    }
+    30% {
+      opacity: 0.7;
+    }
+    to {
+      transform: translate(-6px, 18px);
+      opacity: 0;
+    }
+  }
+  @keyframes puff {
+    from {
+      transform: translate(0, 0) scale(0.6);
+      opacity: 0.7;
+    }
+    to {
+      transform: translate(6px, -26px) scale(1.6);
+      opacity: 0;
     }
   }
   @keyframes rise {
@@ -100,6 +167,11 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
   body {
     background: var(--color-canvas);
@@ -134,11 +206,47 @@
   }
 }
 
+@layer utilities {
+  /* Elemen SVG yang bertransformasi dari pusatnya sendiri (hover rumah, baterai, dsb.). */
+  .origin-self {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+}
+
+/* Halaman masuk tidak bergulir di laptop/desktop (perangkat dengan mouse/trackpad).
+   Di ponsel tetap boleh bergulir agar kolom tidak tertutup keyboard. */
+@media (pointer: fine) and (min-height: 600px) {
+  html:has([data-layar-tetap]) {
+    overflow: hidden;
+  }
+}
+
+/* Muncul saat masuk viewport (lihat components/reveal.tsx). Tanpa JS, konten tetap terlihat. */
+.reveal {
+  transition:
+    opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.js-reveal .reveal:not([data-shown]) {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .reveal {
+    transition: none;
+  }
+  .js-reveal .reveal:not([data-shown]) {
+    opacity: 1;
+    transform: none;
+  }
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
