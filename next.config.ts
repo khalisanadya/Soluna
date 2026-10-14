@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  devIndicators: false,
   experimental: {
     agentFeedback: true,
     // Aplikasi terautentikasi: hampir semua halaman membaca sesi + basis data per permintaan.

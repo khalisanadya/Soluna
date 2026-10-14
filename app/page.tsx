@@ -32,9 +32,9 @@ export default function Landing() {
               <span className="size-1.5 rounded-full bg-sun-500" /> Baterai kehidupan kedua untuk desa terpencil
             </span>
             <h1 className="mt-5 text-[2.6rem] leading-[1.05] font-bold tracking-tight text-ink-950 sm:text-6xl">
-              Listrik desa,
+              Dari limbah
               <br />
-              <span className="text-sun-600">tanpa menebak.</span>
+              <span className="text-sun-600">jadi cerah.</span>
             </h1>
             <p className="mt-5 max-w-lg text-lg leading-relaxed text-ink-600">
               SOLUNA membantu pengelola desa menilai baterai bekas kendaraan listrik, merancang sistem surya, dan memastikan listrik
@@ -52,26 +52,44 @@ export default function Landing() {
               <ShieldCheck className="size-4 text-leaf-500" /> Semua angka dari rumus yang dapat diverifikasi — bukan dari AI.
             </p>
           </div>
-          <div className="animate-rise [animation-delay:120ms]">
-            <EnergyFlow suryaKwh={50} suryaKeDesaKwh={20} suryaKeBateraiKwh={33.3} bebanKwh={50} bateraiKwh={30} gensetKwh={0} socPersen={86} rumah={50} caption="Contoh desa 50 rumah (ilustrasi)" />
+          <div className="lg:scale-105 lg:origin-center">
+            <EnergyFlow suryaKwh={50} suryaKeDesaKwh={20} suryaKeBateraiKwh={33.3} bebanKwh={50} bateraiKwh={30} gensetKwh={0} socPersen={86} rumah={50} />
           </div>
         </section>
 
-        <section className="pb-16">
-          <p className="eyebrow">Empat modul, satu platform</p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {MODUL.map((m) => (
-              <div key={m.k} className="rounded-[var(--radius-card)] bg-surface p-6 shadow-soft ring-1 ring-ink-200/60">
-                <div className="flex items-center justify-between">
-                  <span className={`grid size-11 place-items-center rounded-2xl ${m.tone}`}>
+        <section className="mb-16 overflow-hidden rounded-[2rem] bg-[#f3f6f4] px-6 py-10 ring-1 ring-ink-200/70 sm:px-10 lg:grid lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-12 lg:px-14 lg:py-14">
+          <div>
+            <p className="eyebrow text-leaf-700">Terhubung dalam satu rencana</p>
+            <h2 className="mt-4 max-w-md text-3xl font-semibold tracking-tight text-ink-950 sm:text-4xl">
+              Dari baterai hingga listrik desa, semuanya saling terhubung.
+            </h2>
+            <p className="mt-5 max-w-md text-base leading-relaxed text-ink-600">
+              SOLUNA menyatukan penilaian baterai, perencanaan energi, pemeriksaan kompatibilitas, dan siklus hidup dalam satu alur
+              yang mudah dipahami—agar setiap keputusan teknis tetap berpijak pada kebutuhan desa.
+            </p>
+          </div>
+
+          <div className="relative mt-10 lg:mt-0">
+            <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-4 sm:gap-x-4 sm:gap-y-0">
+              {MODUL.map((m) => (
+                <div key={m.k} className="relative flex flex-col items-center text-center">
+                  <span className={`grid size-12 place-items-center rounded-2xl bg-white shadow-soft ring-1 ring-ink-200/70 ${m.tone}`}>
                     <m.icon className="size-5" />
                   </span>
-                  <span className="num text-sm text-ink-400">Modul {m.k}</span>
+                  <p className="mt-3 text-sm font-medium text-ink-800">{m.t}</p>
+                  <span className="mt-3 hidden h-8 w-px bg-leaf-300 sm:block" />
                 </div>
-                <h3 className="mt-5 font-semibold">{m.t}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-ink-600">{m.d}</p>
+              ))}
+            </div>
+            <div className="mx-auto mt-8 flex max-w-xs items-center justify-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-soft ring-1 ring-ink-200/70">
+              <span className="grid size-10 place-items-center rounded-full bg-sun-100 text-sun-700">
+                <SunMedium className="size-5" />
+              </span>
+              <div>
+                <p className="font-semibold text-ink-950">SOLUNA</p>
+                <p className="text-sm text-ink-500">Satu rencana energi yang utuh</p>
               </div>
-            ))}
+            </div>
           </div>
         </section>
 

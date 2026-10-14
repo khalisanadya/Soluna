@@ -104,7 +104,7 @@ export function AppNav({ user }: { user: NavUser }) {
         <nav className="mt-8 flex-1 space-y-6 overflow-y-auto" aria-label="Navigasi utama">
           {groups.map((g) => (
             <div key={g.title}>
-              <p className="eyebrow mb-2 px-3">{g.title}</p>
+              {g.title !== "Ringkasan" && <p className="eyebrow mb-2 px-3">{g.title}</p>}
               <ul className="space-y-0.5">
                 {g.items.map((it) => {
                   const active = isActive(pathname, it.href, hrefs);

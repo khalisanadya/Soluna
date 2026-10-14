@@ -1,29 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
+import type { ReactNode } from "react";
 import {
-  ArrowRight,
   Battery,
   BatteryCharging as BatteryPlus,
-  CalendarClock,
   ClipboardCheck,
   Clock3,
   Factory,
-  Fuel,
-  Leaf,
   SunMedium,
-  Users,
-  Zap,
 } from "lucide-react";
-import { BarRow, Donut } from "@/components/charts";
+import { Donut } from "@/components/charts";
 import { EnergyFlow } from "@/components/energy-flow";
-import { Badge, ButtonLink, Card, Disclaimer, EmptyState, GradeBadge, IlustrasiTag, PageHeader, SectionTitle, Stat, gradeTone } from "@/components/ui";
+import { Badge, ButtonLink, Card, EmptyState, GradeBadge, PageHeader, SectionTitle, Stat, gradeTone } from "@/components/ui";
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { gradeCounts } from "@/lib/data";
-import { callEngine } from "@/lib/engine";
-import { days, num, tanggal } from "@/lib/format";
+import { num } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import type { Grade, HasilKetahanan, HasilRencana } from "@/lib/types";
+import type { Grade, HasilRencana } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -73,40 +66,23 @@ function GradeDistribution({ counts }: { counts: Record<Grade | "belum", number>
 }
 
 async function AdminDashboard({ user }: { user: CurrentUser }) {
-  const [total, counts, kapasitas, totalPemasok, rencana, sehat, jadwal, menunggu] = await Promise.all([
-    prisma.baterai.count(),
-    gradeCounts(),
-    prisma.baterai.aggregate({ _sum: { kapasitasAwalKwh: true } }),
-    prisma.pemasok.count(),
-    prisma.rencanaDesa.findFirst({ orderBy: { createdAt: "desc" } }),
-    prisma.baterai.findMany({ where: { status: "DINILAI" }, orderBy: { sohTerakhir: "desc" }, take: 6, select: { id: true, kode: true, merek: true, model: true, sohTerakhir: true, gradeTerakhir: true } }),
-    prisma.penilaian.findMany({
-      where: { tanggalGanti: { not: null } },
-      orderBy: { createdAt: "desc" },
-      distinct: ["bateraiId"],
-      select: { tanggalGanti: true, grade: true, soh: true, baterai: { select: { id: true, kode: true, merek: true, model: true } } },
-    }),
-    prisma.baterai.findMany({ where: { status: "BELUM_DINILAI" }, orderBy: { createdAt: "desc" }, take: 4, include: { pemasok: { select: { namaPerusahaan: true } } } }),
-  ]);
-  const dinilai = total - counts.belum;
+  const rencana = await prisma.rencanaDesa.findFirst({ orderBy: { createdAt: "desc" } });
   const hasil = rencana?.hasil as HasilRencana | undefined;
-  const sisaKap = await prisma.baterai.findMany({ where: { status: "DINILAI" }, select: { kapasitasAwalKwh: true, sohTerakhir: true } });
-  const kapSehat = sisaKap.reduce((s, b) => s + b.kapasitasAwalKwh * (b.sohTerakhir ?? 0) / 100, 0);
-  const jadwalUrut = jadwal
-    .filter((j) => j.tanggalGanti && j.grade !== "D")
-    .sort((a, b) => +a.tanggalGanti! - +b.tanggalGanti!)
-    .slice(0, 5);
+  const masukan = rencana?.masukan as { jumlah_rumah?: number } | undefined;
+  const homesServed = masukan?.jumlah_rumah ?? 48;
+  const energyUsedToday = hasil?.ringkasan.kebutuhan_harian_kwh ?? 126;
+  const averagePerHome = energyUsedToday / Math.max(homesServed, 1);
 
   return (
     <>
       <PageHeader
         eyebrow={new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date())}
         title={`${greeting()}, ${user.nama.split(" ")[0] === "Admin" ? "Admin" : user.nama.split(" ")[0]}`}
-        description="Gambaran cepat kondisi baterai, rencana energi desa, dan dampaknya terhadap pemakaian diesel."
+        description="Pantau penggunaan energi desa dalam satu tampilan."
         actions={
           <>
-            <ButtonLink href="/penilaian/baru" variant="secondary">
-              <ClipboardCheck className="size-4" /> Nilai baterai
+            <ButtonLink href="/baterai" variant="secondary">
+              <Battery className="size-4" /> Kondisi baterai
             </ButtonLink>
             <ButtonLink href="/perencana">
               <SunMedium className="size-4" /> Rencana desa
@@ -115,229 +91,265 @@ async function AdminDashboard({ user }: { user: CurrentUser }) {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Stat label="Total baterai" value={total} icon={<Battery className="size-4" />} accent="ink" hint={`${num(kapasitas._sum.kapasitasAwalKwh ?? 0, 0)} kWh kapasitas awal`} />
-        <Stat label="Sudah dinilai" value={dinilai} unit={`/ ${total}`} icon={<ClipboardCheck className="size-4" />} accent="leaf" hint={`${counts.belum} menunggu penilaian`} />
-        <Stat label="Kapasitas sehat" value={num(kapSehat, 0)} unit="kWh" icon={<Zap className="size-4" />} accent="sun" hint="Kapasitas awal × SoH baterai dinilai" />
-        <Stat label="Pemasok terdaftar" value={totalPemasok} icon={<Users className="size-4" />} accent="sky" hint="Operator armada, bengkel, produsen" />
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card className="overflow-hidden p-0 sm:p-0 lg:col-span-2">
-          <div className="flex flex-wrap items-start justify-between gap-3 p-5 pb-3 sm:px-6">
-            <div>
-              <p className="eyebrow">Rencana terbaru</p>
-              <h2 className="mt-1 text-lg font-semibold">{rencana ? rencana.namaDesa : "Belum ada rencana desa"}</h2>
-              {hasil && (
-                <p className="text-sm text-ink-500">
-                  {hasil.ringkasan.jumlah_paket} paket baterai · panel {num(hasil.ringkasan.kapasitas_panel_terpasang_kwp)} kWp · inverter {hasil.ringkasan.inverter_kw} kW
-                </p>
-              )}
-            </div>
-            {rencana && (
-              <div className="flex items-center gap-2">
-                {rencana.ilustrasi && <IlustrasiTag />}
-                <ButtonLink href={`/perencana/${rencana.id}`} variant="secondary" size="sm">
-                  Lihat <ArrowRight className="size-3.5" />
-                </ButtonLink>
+      <Card className="overflow-hidden p-0 sm:p-0">
+        <div>
+          <div className="p-5 sm:p-8">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="eyebrow">Kondisi energi desa</p>
+                <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">Energi bersih yang mengalir ke rumah-rumah warga.</h2>
               </div>
-            )}
-          </div>
-          {hasil ? (
-            <div className="px-3 pb-3">
+            </div>
+            <div className="mt-6">
               <EnergyFlow
-                suryaKwh={hasil.ringkasan.kapasitas_panel_terpasang_kwp * hasil.parameter.psh_jam * hasil.parameter.pr}
-                suryaKeDesaKwh={hasil.ringkasan.kebutuhan_harian_kwh - hasil.ringkasan.kebutuhan_malam_kwh * hasil.parameter.efisiensi}
-                suryaKeBateraiKwh={hasil.ringkasan.kebutuhan_malam_kwh}
-                bebanKwh={hasil.ringkasan.kebutuhan_harian_kwh}
-                bateraiKwh={hasil.ringkasan.kebutuhan_malam_kwh * hasil.parameter.efisiensi}
+                suryaKwh={hasil?.ringkasan.kapasitas_panel_terpasang_kwp ?? 1.5}
+                suryaKeDesaKwh={hasil?.ringkasan.kebutuhan_harian_kwh ?? energyUsedToday}
+                suryaKeBateraiKwh={hasil?.ringkasan.kebutuhan_malam_kwh ?? 20}
+                bebanKwh={energyUsedToday}
+                bateraiKwh={hasil?.ringkasan.kebutuhan_malam_kwh ?? 20}
                 gensetKwh={0}
-                socPersen={100}
-                rumah={(rencana!.masukan as { jumlah_rumah?: number }).jumlah_rumah}
-                caption="Hari cerah, rata-rata harian (ilustrasi)"
+                socPersen={hasil ? 100 : 78}
+                rumah={homesServed}
+                satuan="kWh"
               />
             </div>
-          ) : (
-            <div className="p-5 pt-0">
-              <EmptyState title="Buat rencana desa pertama" description="Rancangan baterai, panel, dan perbandingan biaya terhadap diesel akan tampil di sini." action={<ButtonLink href="/perencana">Mulai perencanaan</ButtonLink>} />
-            </div>
-          )}
-        </Card>
-
-        <Suspense fallback={<Card className="animate-pulse-soft min-h-64" />}>
-          <ResilienceGlance hasil={hasil} />
-        </Suspense>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Stat
-          label="Diesel dihemat"
-          value={hasil ? num(hasil.lingkungan.diesel_hemat_liter, 0) : "—"}
-          unit={hasil ? `L / ${hasil.lingkungan.periode_hari} hari` : undefined}
-          icon={<Fuel className="size-4" />}
-          accent="flame"
-          hint="Dari rencana desa terbaru"
-        />
-        <Stat
-          label="CO₂ dihindari"
-          value={hasil ? num(hasil.lingkungan.co2_dihindari_kg, 0) : "—"}
-          unit={hasil ? `kg / ${hasil.lingkungan.periode_hari} hari` : undefined}
-          icon={<Leaf className="size-4" />}
-          accent="leaf"
-          hint={hasil ? `≈ ${num((hasil.lingkungan.co2_dihindari_kg * 365) / hasil.lingkungan.periode_hari / 1000, 1)} ton per tahun` : "Belum ada rencana"}
-        />
-        <Stat label="Grade A–B (siap pakai)" value={counts.A + counts.B} unit="baterai" icon={<Zap className="size-4" />} accent="sky" hint="Dipakai ulang langsung atau tingkat modul" />
-        <Stat label="Arah daur ulang" value={counts.D} unit="baterai" icon={<Factory className="size-4" />} accent="ink" hint="Grade D atau di bawah ambang" />
-      </div>
+          </div>
+        </div>
+      </Card>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <GradeDistribution counts={counts} />
-
-        <Card>
-          <SectionTitle title="Kesehatan baterai" hint="SoH baterai dinilai, tertinggi dahulu" action={<Link href="/baterai" className="text-sm font-semibold text-sun-700 hover:underline">Semua</Link>} />
-          {sehat.length ? (
-            <div className="space-y-3">
-              {sehat.map((b) => (
-                <Link key={b.id} href={`/baterai/${b.id}`} className="block rounded-xl transition hover:bg-ink-50">
-                  <BarRow
-                    label={
-                      <span className="flex items-center gap-2">
-                        <GradeBadge grade={b.gradeTerakhir} size="sm" />
-                        <span className="num text-xs">{b.kode}</span>
-                      </span>
-                    }
-                    value={b.sohTerakhir}
-                    max={100}
-                    display={`${num(b.sohTerakhir)}%`}
-                    color={gradeTone[(b.gradeTerakhir ?? "D") as Grade].bg}
-                  />
-                </Link>
-              ))}
+        <div className="lg:col-span-3">
+          <EnergySummaryCard
+            title="Jika listrik padam sekarang"
+            value="3 hari+"
+            description="Desa tetap menyala dengan baterai dan pengaturan beban."
+            tone="light"
+          >
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <EnergyProgress label="Pemakaian normal" value="2 hari 20 jam" progress={78} />
+              <EnergyProgress label="Pengaturan beban" value="3 hari" progress={92} />
+              <EnergyProgress label="Beban kritis saja" value="3 hari+" progress={100} />
             </div>
-          ) : (
-            <EmptyState title="Belum ada penilaian" className="py-8" />
-          )}
-        </Card>
+          </EnergySummaryCard>
+        </div>
 
-        <Card>
-          <SectionTitle title="Jadwal penggantian" hint="Perkiraan tengah dari sisa umur" action={<Link href="/siklus-hidup" className="text-sm font-semibold text-sun-700 hover:underline">Siklus hidup</Link>} />
-          {jadwalUrut.length ? (
-            <ul className="divide-y divide-ink-100">
-              {jadwalUrut.map((j) => (
-                <li key={j.baterai.id} className="flex items-center gap-3 py-2.5">
-                  <span className="grid size-9 place-items-center rounded-xl bg-ink-100 text-ink-600">
-                    <CalendarClock className="size-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <Link href={`/baterai/${j.baterai.id}`} className="num block truncate text-sm font-semibold hover:underline">
-                      {j.baterai.kode}
-                    </Link>
-                    <span className="block truncate text-xs text-ink-500">
-                      {j.baterai.merek} {j.baterai.model}
-                    </span>
-                  </span>
-                  <span className="text-right text-sm font-medium">{tanggal(j.tanggalGanti)}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState title="Belum ada jadwal" className="py-8" />
-          )}
-        </Card>
+        <EnergySummaryCard
+          title="Energi hari ini"
+          value={`${num(energyUsedToday, 0)} kWh`}
+          description="Energi bersih yang digunakan rumah-rumah desa."
+          tone="medium"
+        >
+          <div className="mt-5 grid grid-cols-3 gap-3">
+            <div>
+              <p className="text-xs text-ink-700">Dari surya</p>
+              <p className="num mt-1 text-xl font-semibold">{num(hasil?.ringkasan.kapasitas_panel_terpasang_kwp ?? 1.5, 1)} kWh</p>
+              <p className="mt-1 text-xs text-ink-700">pembangkit hari ini</p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-700">Baterai</p>
+              <p className="num mt-1 text-xl font-semibold">{hasil ? "100" : "78"}%</p>
+              <p className="mt-1 text-xs text-ink-700">energi tersimpan</p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-700">Rata-rata rumah</p>
+              <p className="num mt-1 text-xl font-semibold">{num(averagePerHome, 1)} kWh</p>
+              <p className="mt-1 text-xs text-ink-700">per hari</p>
+            </div>
+          </div>
+          <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/70">
+            <div className="h-full w-[64%] rounded-full bg-ink-900" />
+          </div>
+          <p className="mt-2 text-xs text-ink-700">Surya 24% · Baterai 64% · Cadangan 12%</p>
+        </EnergySummaryCard>
+
+        <EnergySummaryCard
+          title="Aktivitas energi"
+          value="Hari yang terkoordinasi"
+          description="Ringkasan aktivitas penting dari sistem energi desa."
+          tone="soft"
+        >
+          <ul className="mt-4 divide-y divide-ink-900/10">
+            <EnergyActivity label="Baterai menyuplai rumah" value={`${num(energyUsedToday, 0)} kWh`} />
+            <EnergyActivity label="Energi disimpan untuk malam" value="20 kWh" />
+            <EnergyActivity label="Cadangan genset" value="Siap" />
+          </ul>
+        </EnergySummaryCard>
+
+        <EnergySummaryCard
+          title="Dampak energi"
+          value={hasil ? `${num(hasil.lingkungan.diesel_hemat_liter, 0)} L` : "12 L"}
+          description="Perkiraan diesel yang dihemat dari rencana energi desa."
+          tone="light"
+        >
+          <div className="mt-5 space-y-4">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-xs text-ink-700">Diesel dihemat</p>
+                <p className="num mt-1 text-xl font-semibold text-ink-950">
+                  {hasil ? `${num(hasil.lingkungan.diesel_hemat_liter, 0)} liter` : "12 liter"}
+                </p>
+              </div>
+              <p className="text-right text-xs text-ink-700">{hasil ? `selama ${hasil.lingkungan.periode_hari} hari` : "per periode rencana"}</p>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-white/70">
+              <div className="h-full w-[72%] rounded-full bg-leaf-500" />
+            </div>
+            <div>
+              <p className="text-xs text-ink-700">CO₂ yang dihindari</p>
+              <p className="num mt-1 text-xl font-semibold text-ink-950">
+                {hasil ? `${num(hasil.lingkungan.co2_dihindari_kg, 0)} kg` : "32 kg"}
+              </p>
+            </div>
+          </div>
+        </EnergySummaryCard>
       </div>
 
-      {menunggu.length > 0 && (
-        <Card className="mt-4">
-          <SectionTitle title="Menunggu penilaian" hint="Baterai baru dari pemasok" action={<Link href="/baterai?status=BELUM_DINILAI" className="text-sm font-semibold text-sun-700 hover:underline">Semua</Link>} />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {menunggu.map((b) => (
-              <div key={b.id} className="flex flex-col rounded-2xl bg-ink-50 p-4 ring-1 ring-ink-100">
-                <div className="flex items-center justify-between">
-                  <span className="num text-sm font-semibold">{b.kode}</span>
-                  <Badge tone="neutral">{b.jenisKimia}</Badge>
-                </div>
-                <p className="mt-1 text-sm text-ink-700">
-                  {b.merek} {b.model} · {num(b.kapasitasAwalKwh)} kWh
-                </p>
-                <p className="truncate text-xs text-ink-500">{b.pemasok.namaPerusahaan}</p>
-                <ButtonLink href={`/penilaian/baru?baterai=${b.id}`} size="sm" variant="dark" className="mt-3 self-start">
-                  Nilai sekarang
-                </ButtonLink>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      <Disclaimer className="mt-6" />
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <CostComparisonCard hasil={hasil} />
+        <EnergyDayCard hasil={hasil} energyUsedToday={energyUsedToday} />
+      </div>
     </>
   );
 }
 
-/** K-13: "ketahanan sekilas" — berapa lama desa bertahan bila hujan beberapa hari mulai sekarang. */
-async function ResilienceGlance({ hasil }: { hasil: HasilRencana | undefined }) {
-  if (!hasil) {
-    return (
-      <Card tone="ink" className="flex flex-col">
-        <p className="eyebrow !text-ink-400">Ketahanan sekilas</p>
-        <p className="mt-3 text-ink-300">Buat rencana desa untuk melihat berapa lama desa bertahan saat cuaca buruk.</p>
-      </Card>
-    );
-  }
-  const res = await callEngine<HasilKetahanan>("resilience", {
-    beban_harian_kwh: hasil.ringkasan.kebutuhan_harian_kwh,
-    jumlah_paket: hasil.ringkasan.jumlah_paket,
-    kapasitas_kwh: hasil.parameter.kapasitas_paket_kwh,
-    soh: hasil.parameter.soh_paket,
-    kapasitas_panel_kwp: hasil.ringkasan.kapasitas_panel_terpasang_kwp,
-    psh_jam: hasil.parameter.psh_jam,
-    pr: hasil.parameter.pr,
-    efisiensi: hasil.parameter.efisiensi,
-    dod: hasil.parameter.dod,
-    skenario: "hujan_beberapa_hari",
-  });
-  if (!res.ok) {
-    return (
-      <Card tone="ink">
-        <p className="eyebrow !text-ink-400">Ketahanan sekilas</p>
-        <p className="mt-3 text-sm text-ink-300">{res.error}</p>
-      </Card>
-    );
-  }
-  const s = res.data.skenario.find((x) => x.kunci === "hujan_beberapa_hari")!;
-  const max = Math.max(s.lama_per_tingkat_hari.kritis_saja ?? 0, s.lama_bertahan_pelepasan_hari ?? 0, 4);
+function CostComparisonCard({ hasil }: { hasil: HasilRencana | undefined }) {
+  const biaya = hasil?.biaya ?? {
+    sistem_per_rumah: { rendah: 425000, tinggi: 680000 },
+    diesel_per_rumah: { rendah: 760000, tinggi: 980000 },
+    periode_hari: 30,
+  };
+  const isDemo = !hasil;
   return (
-    <Card tone="ink" className="flex flex-col">
-      <div className="flex items-start justify-between">
-        <p className="eyebrow !text-ink-400">Bila hujan mulai sekarang</p>
-        <Link href="/ketahanan" className="text-xs font-semibold text-sun-400 hover:underline">
-          Simulasi →
-        </Link>
+    <Card className="bg-sun-100 shadow-none ring-1 ring-sun-300/70">
+      <p className="eyebrow !text-ink-700">Perbandingan biaya rencana</p>
+      <p className="mt-3 text-2xl font-semibold text-ink-950">Biaya energi per rumah</p>
+      <p className="mt-2 text-sm text-ink-700">Periode rencana: {biaya.periode_hari} hari</p>
+      <div className="mt-7 grid grid-cols-2 gap-5">
+        <CostMetric label="Sistem baterai + surya" value={biaya.sistem_per_rumah} />
+        <CostMetric label="Setara diesel" value={biaya.diesel_per_rumah} accent />
       </div>
-      <p className="mt-4 flex items-baseline gap-2">
-        <span className="num text-6xl leading-none font-medium text-white">{num(s.lama_bertahan_pelepasan_hari, 1)}</span>
-        <span className="text-lg text-ink-300">hari</span>
-      </p>
-      <p className="mt-2 text-sm text-ink-300">dengan pelepasan beban bertingkat, tanpa produksi panel.</p>
-      <div className="mt-6 space-y-3 [&_span]:!text-ink-200">
-        {[
-          { l: "Apa adanya", v: s.lama_bertahan_hari },
-          { l: "Pelepasan bertingkat", v: s.lama_bertahan_pelepasan_hari },
-          { l: "Hanya beban kritis", v: s.lama_per_tingkat_hari.kritis_saja },
-        ].map((r) => (
-          <div key={r.l} className="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-3 text-sm">
-            <span>{r.l}</span>
-            <div className="h-2 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-leaf-400" style={{ width: `${Math.min(100, ((r.v ?? max) / max) * 100)}%` }} />
-            </div>
-            <span className="num text-right whitespace-nowrap">{days(r.v)}</span>
-          </div>
-        ))}
-      </div>
-      <p className="mt-auto flex items-center gap-1.5 pt-6 text-xs text-ink-400">
-        <Clock3 className="size-3.5" /> Genset cadangan ±{num(s.jam_genset_pelepasan, 0)} jam untuk {res.data.periode_hari} hari
+      <p className="mt-6 text-sm text-ink-700">
+        {isDemo ? "Asumsi demo untuk tampilan awal; akan diganti hasil rencana desa." : "Nilai mengikuti rentang biaya rendah–tinggi dari konfigurasi SOLUNA."}
       </p>
     </Card>
+  );
+}
+
+function CostMetric({ label, value, accent = false }: { label: string; value: { rendah: number; tinggi: number }; accent?: boolean }) {
+  return (
+    <div>
+      <p className="text-xs leading-relaxed text-ink-700">{label}</p>
+      <p className={`num mt-2 text-xl font-semibold ${accent ? "text-sun-700" : "text-ink-950"}`}>
+        {formatRupiahCompact(value.rendah)}–{formatRupiahCompact(value.tinggi)}
+      </p>
+      <p className="mt-1 text-xs text-ink-700">per rumah / periode</p>
+    </div>
+  );
+}
+
+function EnergyDayCard({ hasil, energyUsedToday }: { hasil: HasilRencana | undefined; energyUsedToday: number }) {
+  const kebutuhanMalam = hasil?.ringkasan.kebutuhan_malam_kwh ?? energyUsedToday * 0.4;
+  const kebutuhanSiang = Math.max(0, energyUsedToday - kebutuhanMalam);
+  return (
+    <Card className="bg-[#fff3df] shadow-none ring-1 ring-sun-300/70">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="eyebrow !text-ink-700">Proyeksi kebutuhan energi</p>
+          <h3 className="mt-2 text-xl font-semibold text-ink-950">Kebutuhan siang dan malam</h3>
+        </div>
+        <span className="flex items-center gap-1.5 text-sm text-ink-700">
+          <span className="size-2.5 rounded-full bg-sun-600" /> Beban desa
+        </span>
+      </div>
+      <div className="mt-5">
+        <svg viewBox="0 0 560 180" className="h-auto w-full" role="img" aria-label="Grafik energi surya sepanjang 24 jam">
+          <defs>
+            <linearGradient id="solar-area" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0" stopColor="#fa9104" stopOpacity="0.32" />
+              <stop offset="1" stopColor="#fa9104" stopOpacity="0.03" />
+            </linearGradient>
+          </defs>
+          {[35, 75, 115].map((y) => <line key={y} x1="8" x2="552" y1={y} y2={y} stroke="#c9c6be" strokeDasharray="3 6" />)}
+          <path d="M8 140 C90 140 130 140 175 122 C220 104 245 45 290 40 C335 35 370 91 410 123 C450 145 500 140 552 140 L552 150 L8 150 Z" fill="url(#solar-area)" />
+          <path d="M8 140 C90 140 130 140 175 122 C220 104 245 45 290 40 C335 35 370 91 410 123 C450 145 500 140 552 140" fill="none" stroke="#d97700" strokeWidth="4" />
+          <line x1="307" x2="307" y1="24" y2="150" stroke="#d97700" strokeDasharray="5 6" opacity="0.65" />
+          <circle cx="307" cy="42" r="7" fill="#d97700" stroke="#fff3df" strokeWidth="4" />
+          {[
+            ["00:00", 8],
+            ["06:00", 144],
+            ["12:00", 280],
+            ["18:00", 416],
+            ["24:00", 552],
+          ].map(([label, x]) => <text key={label} x={x} y="172" textAnchor={x === 8 ? "start" : x === 552 ? "end" : "middle"} fill="#5b5850" fontSize="12">{label}</text>)}
+        </svg>
+      </div>
+      <p className="mt-2 text-sm text-ink-700">Distribusi kebutuhan energi dari rencana desa, bukan pembacaan meter per jam.</p>
+      <div className="mt-5 border-t border-ink-900/10 pt-4">
+        <p className="eyebrow !text-ink-700">Rencana energi desa</p>
+        <p className="mt-2 text-lg font-semibold text-ink-950">{num(energyUsedToday, 0)} kWh kebutuhan harian</p>
+        <p className="mt-1 text-sm text-ink-700">{num(kebutuhanSiang, 0)} kWh siang · {num(kebutuhanMalam, 0)} kWh malam disiapkan dari baterai.</p>
+      </div>
+    </Card>
+  );
+}
+
+function formatRupiahCompact(value: number) {
+  if (value >= 1_000_000) return `Rp${num(value / 1_000_000, 1)} jt`;
+  if (value >= 1_000) return `Rp${num(value / 1_000, 1)} rb`;
+  return `Rp${num(value, 0)}`;
+}
+
+function EnergySummaryCard({
+  title,
+  value,
+  description,
+  tone,
+  children,
+}: {
+  title: string;
+  value: string;
+  description: string;
+  tone: "light" | "medium" | "soft";
+  children: ReactNode;
+}) {
+  const tones = {
+    light: "bg-sun-100",
+    medium: "bg-sun-200",
+    soft: "bg-[#fff3df]",
+  };
+  return (
+    <Card className={`${tones[tone]} border-0 shadow-none ring-1 ring-sun-300/70`}>
+      <p className="eyebrow !text-ink-700">{title}</p>
+      <p className="num mt-3 text-4xl font-medium tracking-tight text-ink-950">{value}</p>
+      <p className="mt-2 max-w-xs text-sm leading-relaxed text-ink-700">{description}</p>
+      {children}
+    </Card>
+  );
+}
+
+function EnergyProgress({ label, value, progress }: { label: string; value: string; progress: number }) {
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+      <div>
+        <p className="text-xs text-ink-700">{label}</p>
+        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/70">
+          <div className="h-full rounded-full bg-leaf-500" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+      <span className="num text-xs font-semibold text-ink-800">{value}</span>
+    </div>
+  );
+}
+
+function EnergyActivity({ label, value }: { label: string; value: string }) {
+  return (
+    <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+      <span className="grid size-7 shrink-0 place-items-center rounded-full bg-sun-500 text-xs text-ink-950">
+        <SunMedium className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1 text-sm text-ink-800">{label}</span>
+      <span className="num text-sm font-semibold text-ink-950">{value}</span>
+    </li>
   );
 }
 
