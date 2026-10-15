@@ -15,7 +15,7 @@ async function NavLoader() {
       user={{
         nama: user.nama,
         peran: user.peran,
-        sub: user.peran === "ADMIN" ? "Admin desa" : (user.namaPerusahaan ?? "Pemasok"),
+        sub: user.peran === "ADMIN" ? "Pengelola Sistem Desa" : (user.namaPerusahaan ?? "Pemasok"),
       }}
     />
   );

@@ -14,7 +14,7 @@ from typing import Any, Generic, TypeVar
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from soluna_engine import assessment, compatibility, explain, lifecycle, planner, resilience
+from soluna_engine import assessment, compatibility, explain, lifecycle, match, planner, resilience
 from soluna_engine.config import MODEL_VERSION, default_config, merge_config
 
 app = FastAPI(title="SOLUNA Engine", version="0.1.0")
@@ -71,6 +71,11 @@ def post_compatibility(req: Req[compatibility.CompatibilityInput]) -> dict[str, 
 @app.post("/lifecycle")
 def post_lifecycle(req: Req[lifecycle.LifecycleInput]) -> dict[str, Any]:
     return _clean(lifecycle.analyze(req.input, merge_config(req.config)))
+
+
+@app.post("/match")
+def post_match(req: Req[match.MatchInput]) -> dict[str, Any]:
+    return _clean(match.match(req.input, merge_config(req.config)))
 
 
 @app.post("/explain")

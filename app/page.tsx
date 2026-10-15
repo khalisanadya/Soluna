@@ -76,8 +76,8 @@ const LANGKAH = [
   {
     n: "01",
     t: "Nilai",
-    who: "Pemasok & admin",
-    d: "Pemasok mendaftarkan baterai bekas. Admin menilai kondisinya dan menerbitkan paspor baterai.",
+    who: "Pemasok & pengelola",
+    d: "Pemasok mendaftarkan baterai bekas. Pengelola sistem desa menilai kondisinya dan menerbitkan paspor baterai.",
     icon: ClipboardCheck,
   },
   {
@@ -90,7 +90,7 @@ const LANGKAH = [
   {
     n: "03",
     t: "Bertahan",
-    who: "Admin desa",
+    who: "Pengelola Sistem Desa",
     d: "Simulasi menguji ketahanan saat mendung atau hujan, agar beban kritis tetap menyala.",
     icon: ShieldCheck,
   },

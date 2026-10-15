@@ -79,7 +79,7 @@ export async function register(_prev: FormState, fd: FormData): Promise<FormStat
     if (!namaAdmin) errors.nama = ["Nama wajib diisi."];
     // Bila ADMIN_INVITE_CODE diatur, pendaftaran admin memerlukan kode undangan.
     const kode = process.env.ADMIN_INVITE_CODE;
-    if (kode && fd.get("kodeAdmin") !== kode) errors.kodeAdmin = ["Kode admin tidak valid."];
+    if (kode && fd.get("kodeAdmin") !== kode) errors.kodeAdmin = ["Kode undangan pengelola tidak valid."];
   }
 
   if (Object.keys(errors).length || !akun.success) {

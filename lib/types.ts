@@ -41,6 +41,8 @@ export type HasilRencana = {
     kapasitas_panel_kwp: number;
     kapasitas_panel_terpasang_kwp: number;
     jumlah_panel: number;
+    /** Ada sejak versi mesin yang menambahkan estimasi produksi; rencana lama tidak memilikinya. */
+    produksi_surya_harian_kwh?: number;
     daya_puncak_kw: number;
     inverter_kw: number;
   };
@@ -150,5 +152,26 @@ export type HasilSiklus = {
   }[];
   ringkasan: Record<StatusSiklus, number>;
   ambang: { penggantian_soh: number; margin_soh: number; batas_sisa_umur_tahun: number };
+  versi_model: string;
+};
+
+export type StatusCocok = "direkomendasikan" | "perlu_penyesuaian" | "tidak_direkomendasikan" | "belum_dinilai";
+
+export type HasilPencocokan = {
+  baterai: {
+    id: string;
+    kode: string;
+    status: StatusCocok;
+    label: string;
+    alasan: string[];
+    keputusan: string | null;
+    kapasitas_terpakai_kwh: number | null;
+    paket_siklus_harian: number | null;
+    jumlah_paket: number | null;
+    daya_baterai_kw: number | null;
+    daur_ulang: boolean;
+  }[];
+  ringkasan: Record<StatusCocok, number>;
+  catatan: string;
   versi_model: string;
 };

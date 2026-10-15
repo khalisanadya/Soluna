@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { LogOut, PartyPopper, Sun } from "lucide-react";
+import { LogOut, PartyPopper, Sun, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { SubmitButton } from "./submit-button";
 import { buttonClass } from "./ui";
@@ -64,61 +64,62 @@ function readFlash(): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+/* Notifikasi kecil di pojok kanan atas, menutup sendiri setelah 3 detik. */
 export function WelcomeDialog({ nama, peran }: { nama: string; peran: "ADMIN" | "PEMASOK" }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const [jenis, setJenis] = useState<"masuk" | "baru">("masuk");
+  const [jenis, setJenis] = useState<"masuk" | "baru" | null>(null);
 
   useEffect(() => {
     const flash = readFlash();
     if (!flash) return;
-    let timer: number | undefined;
-    // Buka pada frame berikutnya, setelah halaman tujuan selesai tampil.
+    // Cookie dihapus di dalam callback (bukan langsung) agar efek yang dijalankan ulang
+    // oleh Strict Mode masih bisa membacanya; sambutan tetap hanya muncul sekali.
     const id = requestAnimationFrame(() => {
-      // Hapus cookie agar sambutan hanya muncul sekali.
       document.cookie = `${SAMBUTAN_COOKIE}=; Max-Age=0; path=/`;
       setJenis(flash === "baru" ? "baru" : "masuk");
-      ref.current?.showModal();
-      // Tutup otomatis setelah 3 detik; tetap bisa ditutup lebih cepat lewat tombol/Esc.
-      timer = window.setTimeout(() => ref.current?.close(), SAMBUTAN_MS);
     });
-    return () => {
-      cancelAnimationFrame(id);
-      window.clearTimeout(timer);
-    };
+    return () => cancelAnimationFrame(id);
   }, []);
 
+  useEffect(() => {
+    if (!jenis) return;
+    const timer = window.setTimeout(() => setJenis(null), SAMBUTAN_MS);
+    return () => window.clearTimeout(timer);
+  }, [jenis]);
+
+  if (!jenis) return null;
   const baru = jenis === "baru";
-  const depan = nama.split(" ")[0];
   return (
-    <dialog ref={ref} className={dialogClass} aria-labelledby="judul-sambutan" onClick={(e) => e.target === e.currentTarget && ref.current?.close()}>
-      <div className="relative overflow-hidden rounded-[1.75rem]">
-        <div className="relative bg-ink-950 px-6 pt-8 pb-10 text-center text-white">
-          <div className="pointer-events-none absolute -top-16 -right-10 size-44 rounded-full bg-sun-500/25 blur-2xl" aria-hidden="true" />
-          <span className={cn("relative mx-auto grid size-14 place-items-center rounded-2xl", baru ? "bg-zest-300 text-ink-950" : "bg-sun-500 text-ink-950")}>
-            {baru ? <PartyPopper className="size-6" /> : <Sun className="size-6" />}
-          </span>
-          <h2 id="judul-sambutan" className="relative mt-5 text-2xl font-bold tracking-tight">
-            {baru ? "Akun berhasil dibuat!" : `Selamat datang, ${depan}!`}
-          </h2>
-          <p className="relative mt-2 text-sm text-ink-300">
-            {baru
-              ? `Selamat bergabung di SOLUNA, ${depan}.`
-              : peran === "ADMIN"
-                ? "Siap merencanakan listrik desa hari ini?"
-                : "Siap menyalurkan baterai untuk desa hari ini?"}
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed top-4 right-4 left-4 z-50 ml-auto max-w-sm animate-drop overflow-hidden rounded-2xl bg-surface text-ink-900 shadow-lift ring-1 ring-sun-300/70 sm:top-5 sm:right-6"
+    >
+      <div className="flex items-center gap-3.5 p-4 pr-3">
+        <span className={cn("grid size-11 shrink-0 place-items-center rounded-xl", baru ? "bg-zest-300 text-ink-950" : "bg-sun-500 text-ink-950")}>
+          {baru ? <PartyPopper className="size-5" /> : <Sun className="size-5" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[0.6875rem] font-semibold tracking-[0.12em] text-sun-600 uppercase">
+            {baru ? "Akun berhasil dibuat" : peran === "ADMIN" ? "Pengelola Sistem Desa" : "Pemasok"}
+          </p>
+          <p className="mt-0.5 leading-snug">
+            <span className="font-bold">{baru ? "Selamat bergabung," : "Selamat datang,"}</span> {nama}
           </p>
         </div>
-        <div className="bg-canvas p-6">
-          <p className="text-center text-sm text-ink-600">
-            {peran === "ADMIN"
-              ? "Mulai dengan menilai baterai dari pemasok, lalu rancang dan uji ketahanan energi desa."
-              : "Mulai dengan mendaftarkan baterai bekas Anda agar bisa dinilai oleh admin desa."}
-          </p>
-          <button type="button" onClick={() => ref.current?.close()} className={buttonClass("primary", "md", "mt-5 w-full")} autoFocus>
-            Mulai
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setJenis(null)}
+          className="grid size-8 shrink-0 place-items-center self-start rounded-full text-ink-500 transition hover:bg-ink-100 hover:text-ink-900"
+          aria-label="Tutup"
+        >
+          <X className="size-4" />
+        </button>
       </div>
-    </dialog>
+      <div
+        className="h-1 origin-left animate-countdown bg-gradient-to-r from-sun-400 to-zest-300"
+        style={{ "--durasi": `${SAMBUTAN_MS}ms` } as React.CSSProperties}
+        aria-hidden="true"
+      />
+    </div>
   );
 }

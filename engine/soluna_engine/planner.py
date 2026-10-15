@@ -33,6 +33,17 @@ class PlanInput(BaseModel):
     periode_hari: int = Field(default=30, gt=0, le=366)
 
 
+def ukuran_paket(e_malam: float, kap: float, soh: float, dod: float, hari_cadangan: int) -> tuple[float, int, int]:
+    """Rumus ukuran paket (laporan bagian 8), dipakai Perencana dan Pencocokan.
+
+    C_pakai = kapasitas × SoH × DoD; N_siklus = ceil(E_malam / C_pakai);
+    N_paket = N_siklus × (1 + hari cadangan).
+    """
+    c_pakai = kap * soh * dod
+    n_siklus = ceil(e_malam / c_pakai)
+    return c_pakai, n_siklus, n_siklus * (1 + hari_cadangan)
+
+
 def plan(data: PlanInput, cfg: dict[str, Any]) -> dict[str, Any]:
     bawaan: list[str] = []
 
@@ -63,15 +74,13 @@ def plan(data: PlanInput, cfg: dict[str, Any]) -> dict[str, Any]:
     L.append(step("Kebutuhan malam", "E_malam = E_harian × porsi malam / η",
                   f"{fmt(e_harian)} × {fmt(data.porsi_malam)} / {fmt(eta)}", r(e_malam), "kWh"))
 
-    c_pakai = kap * soh * dod
+    c_pakai, n_siklus, n_paket = ukuran_paket(e_malam, kap, soh, dod, hari_cadangan)
     L.append(step("Kapasitas terpakai per paket", "C_pakai = kapasitas × SoH × DoD",
                   f"{fmt(kap)} × {fmt(soh)} × {fmt(dod)}", r(c_pakai), "kWh"))
 
-    n_siklus = ceil(e_malam / c_pakai)
     L.append(step("Paket untuk siklus harian", "N_siklus = ceil(E_malam / C_pakai)",
                   f"ceil({fmt(e_malam)} / {fmt(c_pakai)})", n_siklus, "paket"))
 
-    n_paket = n_siklus * (1 + hari_cadangan)
     L.append(step("Paket dengan cadangan", "N_paket = N_siklus × (1 + hari cadangan)",
                   f"{n_siklus} × (1 + {hari_cadangan})", n_paket, "paket"))
 
@@ -83,6 +92,10 @@ def plan(data: PlanInput, cfg: dict[str, Any]) -> dict[str, Any]:
     kwp_terpasang = jumlah_panel * wp_panel / 1000
     L.append(step("Jumlah panel", "ceil(P_panel / kapasitas per panel)",
                   f"ceil({fmt(p_panel)} kWp / {fmt(wp_panel / 1000, 3)} kWp)", jumlah_panel, "panel"))
+
+    produksi_surya = kwp_terpasang * psh * pr
+    L.append(step("Estimasi produksi surya", "kWp terpasang × PSH × PR",
+                  f"{fmt(kwp_terpasang)} × {fmt(psh)} × {fmt(pr)}", r(produksi_surya), "kWh/hari"))
 
     e_tersedia = n_paket * kap * soh * dod
     L.append(step("Energi baterai tersedia", "E_tersedia = N_paket × kapasitas × SoH × DoD",
@@ -180,6 +193,7 @@ def plan(data: PlanInput, cfg: dict[str, Any]) -> dict[str, Any]:
             "kapasitas_panel_kwp": r(p_panel),
             "kapasitas_panel_terpasang_kwp": r(kwp_terpasang),
             "jumlah_panel": jumlah_panel,
+            "produksi_surya_harian_kwh": r(produksi_surya),
             "daya_puncak_kw": r(daya_puncak),
             "inverter_kw": inverter_kw,
         },

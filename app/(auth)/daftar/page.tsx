@@ -9,7 +9,7 @@ export default function DaftarPage() {
       <p className="eyebrow">Buat akun</p>
       <h1 className="mt-2 text-[2rem] leading-tight font-bold tracking-tight text-ink-950">Daftar ke SOLUNA</h1>
       <p className="mt-2 text-ink-600">
-        Pemasok menyalurkan baterai bekas kendaraan listrik; admin desa mengelola penilaian dan perencanaan energi. 
+        Pemasok menyalurkan baterai bekas kendaraan listrik; pengelola sistem desa mengelola penilaian dan perencanaan energi. 
        
       </p>
       <RegisterForm adminCodeRequired={Boolean(process.env.ADMIN_INVITE_CODE)} />

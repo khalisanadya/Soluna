@@ -9,7 +9,7 @@ export type EngineResult<T> =
 
 // Semua angka penting berasal dari layanan hitung Python (FastAPI), bukan dari UI.
 export async function callEngine<T extends { versi_model?: string }>(
-  endpoint: "assess" | "plan" | "resilience" | "compatibility" | "lifecycle",
+  endpoint: "assess" | "plan" | "resilience" | "compatibility" | "lifecycle" | "match",
   input: unknown,
 ): Promise<EngineResult<T>> {
   const { versi, data: config } = await getActiveConfig();

@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import type { Prisma } from "@prisma/client";
-import { BatteryCharging, ChevronRight, Plus, Search } from "lucide-react";
-import { Badge, ButtonLink, Card, EmptyState, GradeBadge, IlustrasiTag, PageHeader, buttonClass, inputClass } from "@/components/ui";
+import { BatteryCharging, ChevronRight, Plus } from "lucide-react";
+import { Badge, ButtonLink, Card, EmptyState, GradeBadge, IlustrasiTag, PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { bateraiScope } from "@/lib/data";
 import { num } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { JENIS_KIMIA } from "@/lib/wilayah";
+import { FilterForm } from "./filter-form";
 
 export const metadata: Metadata = { title: "Baterai" };
 
@@ -48,7 +50,7 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
   return (
     <>
       <PageHeader
-        eyebrow="Aset"
+        eyebrow="Baterai"
         title={isAdmin ? "Daftar baterai" : "Baterai saya"}
         description={isAdmin ? "Semua baterai bekas yang ditawarkan pemasok. Pilih baterai untuk dinilai." : "Baterai yang Anda daftarkan beserta status penilaiannya."}
         actions={
@@ -58,50 +60,9 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
         }
       />
 
-      <form className="mb-4 grid gap-2 rounded-[var(--radius-card)] bg-surface p-3 shadow-soft ring-1 ring-ink-200/60 sm:grid-cols-2 lg:flex lg:items-center" role="search">
-        <label className="relative lg:flex-1">
-          <span className="sr-only">Cari baterai</span>
-          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-400" />
-          <input name="q" defaultValue={q} placeholder="Cari kode, merek, model, pemasok…" className={`${inputClass} pl-10`} />
-        </label>
-        <select name="status" defaultValue={status} className={`${inputClass} lg:w-40`} aria-label="Status">
-          <option value="">Semua status</option>
-          <option value="DINILAI">Sudah dinilai</option>
-          <option value="BELUM_DINILAI">Belum dinilai</option>
-        </select>
-        <select name="grade" defaultValue={grade} className={`${inputClass} lg:w-32`} aria-label="Grade">
-          <option value="">Semua grade</option>
-          {["A", "B", "C", "D"].map((g) => (
-            <option key={g} value={g}>
-              Grade {g}
-            </option>
-          ))}
-        </select>
-        <select name="kimia" defaultValue={kimia} className={`${inputClass} lg:w-32`} aria-label="Jenis kimia">
-          <option value="">Semua kimia</option>
-          {JENIS_KIMIA.map((k) => (
-            <option key={k}>{k}</option>
-          ))}
-        </select>
-        {isAdmin && (
-          <select name="pemasok" defaultValue={pemasokId} className={`${inputClass} lg:w-52`} aria-label="Pemasok">
-            <option value="">Semua pemasok</option>
-            {pemasok.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.namaPerusahaan}
-              </option>
-            ))}
-          </select>
-        )}
-        <div className="flex gap-2">
-          <button className={buttonClass("dark", "md", "flex-1 lg:flex-none")}>Terapkan</button>
-          {filtered && (
-            <Link href="/baterai" className={buttonClass("ghost", "md")}>
-              Reset
-            </Link>
-          )}
-        </div>
-      </form>
+      <Suspense fallback={<div className="mb-4 h-[4.25rem] rounded-[var(--radius-card)] bg-surface ring-1 ring-ink-200/60" />}>
+        <FilterForm kimia={JENIS_KIMIA} pemasok={isAdmin ? pemasok : null} />
+      </Suspense>
 
       {rows.length === 0 ? (
         <EmptyState

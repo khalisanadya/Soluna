@@ -171,3 +171,49 @@ def test_api_end_to_end():
     assert res.status_code == 200
     normal = next(s for s in res.json()["skenario"] if s["kunci"] == "normal")
     assert normal["lama_bertahan_hari"] == approx(2)
+
+
+def test_produksi_surya_harian(rencana):
+    # kWp terpasang × PSH 4 jam × PR 0,75
+    r = rencana["ringkasan"]
+    assert r["produksi_surya_harian_kwh"] == pytest.approx(r["kapasitas_panel_terpasang_kwp"] * 4 * 0.75, rel=1e-3)
+
+
+def _kebutuhan(rencana):
+    from soluna_engine.match import KebutuhanRencana
+
+    r, p = rencana["ringkasan"], rencana["parameter"]
+    return KebutuhanRencana(
+        kebutuhan_malam_kwh=r["kebutuhan_malam_kwh"], daya_puncak_kw=r["daya_puncak_kw"], dod=p["dod"], hari_cadangan=p["hari_cadangan"]
+    )
+
+
+def test_pencocokan_sama_dengan_perencana(rencana):
+    """Paket 50 kWh SoH 70% harus menghasilkan 28 kWh, 2 paket harian, 4 paket — sama dengan bagian 8."""
+    from soluna_engine.match import BateraiKandidat, MatchInput, match
+
+    out = match(MatchInput(rencana=_kebutuhan(rencana), baterai=[
+        BateraiKandidat(id="a", kode="A", kapasitas_kwh=50, soh=70, grade="B", status_kompatibilitas="layak"),
+    ]), CFG)["baterai"][0]
+    assert out["kapasitas_terpakai_kwh"] == approx(28)
+    assert out["paket_siklus_harian"] == 2
+    assert out["jumlah_paket"] == 4
+    assert out["status"] == "perlu_penyesuaian"  # grade B → tingkat modul
+
+
+def test_pencocokan_status(rencana):
+    from soluna_engine.match import BateraiKandidat, MatchInput, match
+
+    k = _kebutuhan(rencana)
+    res = {b["id"]: b for b in match(MatchInput(rencana=k, baterai=[
+        BateraiKandidat(id="ok", kode="1", kapasitas_kwh=50, soh=85, grade="A", status_kompatibilitas="layak"),
+        BateraiKandidat(id="belum_cek", kode="2", kapasitas_kwh=50, soh=85, grade="A"),
+        BateraiKandidat(id="d", kode="3", kapasitas_kwh=50, soh=55, grade="D", status_kompatibilitas="layak"),
+        BateraiKandidat(id="tl", kode="4", kapasitas_kwh=50, soh=85, grade="A", status_kompatibilitas="tidak_layak"),
+        BateraiKandidat(id="baru", kode="5", kapasitas_kwh=50),
+    ]), CFG)["baterai"]}
+    assert res["ok"]["status"] == "direkomendasikan"
+    assert res["belum_cek"]["status"] == "perlu_penyesuaian"
+    assert res["d"]["status"] == "tidak_direkomendasikan" and res["d"]["daur_ulang"]
+    assert res["tl"]["status"] == "tidak_direkomendasikan"
+    assert res["baru"]["status"] == "belum_dinilai"

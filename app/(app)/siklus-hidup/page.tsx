@@ -5,10 +5,9 @@ import { TrendLine } from "@/components/charts";
 import { Badge, Card, Disclaimer, EmptyState, GradeBadge, Notice, PageHeader, SectionTitle, Stat, buttonClass } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
-import { callEngine } from "@/lib/engine";
+import { analisisSiklus, bateraiDinilaiUntukSiklus } from "@/lib/analisis";
 import { bulanTahun, cn, num, tanggal } from "@/lib/format";
-import { prisma } from "@/lib/prisma";
-import type { HasilSiklus, StatusSiklus } from "@/lib/types";
+import type { StatusSiklus } from "@/lib/types";
 import { ReadingForm } from "./reading-form";
 
 export const metadata: Metadata = { title: "Siklus Hidup" };
@@ -24,26 +23,8 @@ export default async function SiklusHidupPage({ searchParams }: PageProps<"/sikl
   await requireAdmin();
   const sp = await searchParams;
   const tab = sp.tab === "riwayat" ? "riwayat" : "jadwal";
-  const [baterai, { data: cfg }] = await Promise.all([
-    prisma.baterai.findMany({
-      where: { status: "DINILAI" },
-      orderBy: { kode: "asc" },
-      include: { bacaanSoh: { orderBy: { tanggal: "asc" } }, penilaian: { orderBy: { createdAt: "desc" }, take: 1 } },
-    }),
-    getActiveConfig(),
-  ]);
-
-  const res = await callEngine<HasilSiklus>("lifecycle", {
-    baterai: baterai.map((b) => ({
-      id: b.id,
-      kode: b.kode,
-      soh_terakhir: b.sohTerakhir,
-      grade: b.gradeTerakhir,
-      sisa_umur_tengah: b.penilaian[0]?.sisaUmurTengah,
-      tanggal_penilaian: b.penilaian[0]?.createdAt.toISOString().slice(0, 10),
-      bacaan: b.bacaanSoh.map((r) => ({ tanggal: r.tanggal.toISOString().slice(0, 10), soh: r.soh })),
-    })),
-  });
+  const [baterai, { data: cfg }] = await Promise.all([bateraiDinilaiUntukSiklus(), getActiveConfig()]);
+  const res = await analisisSiklus(baterai);
   const byId = new Map(baterai.map((b) => [b.id, b]));
   const selectedId = typeof sp.baterai === "string" && byId.has(sp.baterai) ? sp.baterai : baterai[0]?.id;
   const selected = selectedId ? byId.get(selectedId) : undefined;

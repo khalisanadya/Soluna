@@ -93,7 +93,7 @@ function validate(name: Name, v: Record<Name, string>): string | undefined {
       if (!v.provinsiPenyimpanan) return "Pilih provinsi terlebih dahulu.";
       return isKabupatenKotaDi(v.provinsiPenyimpanan, v.kotaPenyimpanan) ? undefined : "Pilih kabupaten/kota dari daftar.";
     case "kodeAdmin":
-      return v.kodeAdmin.trim() ? undefined : "Kode admin wajib diisi.";
+      return v.kodeAdmin.trim() ? undefined : "Kode undangan pengelola wajib diisi.";
     case "email":
       return zodError(emailSchema, v.email);
     case "username":
@@ -167,7 +167,7 @@ export function RegisterForm({ adminCodeRequired }: { adminCodeRequired: boolean
             <div className="grid gap-3 sm:grid-cols-2">
               {[
                 { k: "PEMASOK" as const, t: "Pemasok baterai", d: "Operator armada, bengkel, produsen", icon: Building2 },
-                { k: "ADMIN" as const, t: "Admin desa", d: "BUMDes, koperasi, petugas teknis", icon: ShieldUser },
+                { k: "ADMIN" as const, t: "Pengelola Sistem Desa", d: "BUMDes, koperasi, petugas teknis", icon: ShieldUser },
               ].map((o) => {
                 const active = peran === o.k;
                 return (
@@ -268,10 +268,10 @@ export function RegisterForm({ adminCodeRequired }: { adminCodeRequired: boolean
             </Step>
           </>
         ) : (
-          <Step n={2} title="Data admin">
+          <Step n={2} title="Data pengelola">
             <div className="grid gap-4 sm:grid-cols-2">
               {text("nama", "Nama lengkap", { autoComplete: "name" }, { className: adminCodeRequired ? "" : "sm:col-span-2" })}
-              {adminCodeRequired && text("kodeAdmin", "Kode admin", { autoComplete: "off" }, { hint: "Diberikan oleh pengelola SOLUNA." })}
+              {adminCodeRequired && text("kodeAdmin", "Kode undangan pengelola", { autoComplete: "off" }, { hint: "Diberikan oleh pengelola SOLUNA." })}
             </div>
           </Step>
         )}

@@ -48,7 +48,7 @@ export function PageHeader({
   actions,
 }: {
   eyebrow?: ReactNode;
-  title: ReactNode;
+  title?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
 }) {
@@ -56,7 +56,7 @@ export function PageHeader({
     <header className="mb-6 flex flex-col gap-4 sm:mb-8 md:flex-row md:items-end md:justify-between">
       <div className="max-w-2xl">
         {eyebrow && <div className="eyebrow mb-2 flex items-center gap-2">{eyebrow}</div>}
-        <h1 className="text-[1.75rem] leading-tight font-bold tracking-tight text-ink-950 sm:text-[2.1rem]">{title}</h1>
+        {title && <h1 className="text-[1.75rem] leading-tight font-bold tracking-tight text-ink-950 sm:text-[2.1rem]">{title}</h1>}
         {description && <p className="mt-2 text-[0.95rem] leading-relaxed text-ink-600">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -171,6 +171,7 @@ export function Stat({
   hint,
   icon,
   accent,
+  href,
   className,
 }: {
   label: ReactNode;
@@ -179,6 +180,8 @@ export function Stat({
   hint?: ReactNode;
   icon?: ReactNode;
   accent?: "sun" | "leaf" | "flame" | "sky" | "ink";
+  /** Bila diisi, kartu menjadi tautan ke halaman detailnya. */
+  href?: string;
   className?: string;
 }) {
   const accents = {
@@ -188,8 +191,13 @@ export function Stat({
     sky: "bg-sky-50 text-sky-600",
     ink: "bg-ink-100 text-ink-700",
   };
-  return (
-    <div className={cn("rounded-[1.25rem] bg-surface p-4 shadow-soft ring-1 ring-ink-200/60 sm:p-5", className)}>
+  const box = cn(
+    "block rounded-[1.25rem] bg-surface p-4 shadow-soft ring-1 ring-ink-200/60 sm:p-5",
+    href && "transition-colors hover:ring-ink-300 focus-visible:ring-2 focus-visible:ring-sun-400 focus-visible:outline-none",
+    className,
+  );
+  const body = (
+    <>
       <div className="flex items-start justify-between gap-2">
         <p className="text-[0.8rem] leading-snug font-medium text-ink-500">{label}</p>
         {icon && <span className={cn("grid size-8 shrink-0 place-items-center rounded-full", accents[accent ?? "ink"])}>{icon}</span>}
@@ -199,7 +207,14 @@ export function Stat({
         {unit && <span className="ml-1 text-sm font-normal text-ink-500">{unit}</span>}
       </p>
       {hint && <p className="mt-2 text-xs text-ink-500">{hint}</p>}
-    </div>
+    </>
+  );
+  return href ? (
+    <Link href={href} className={box}>
+      {body}
+    </Link>
+  ) : (
+    <div className={box}>{body}</div>
   );
 }
 

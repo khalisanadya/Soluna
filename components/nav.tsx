@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Activity,
+  ArrowLeftRight,
   Battery,
   PackagePlus as BatteryPlus,
   Building2,
@@ -28,32 +29,34 @@ import { Logo } from "./ui";
 type Item = { href: string; label: string; short?: string; icon: React.ComponentType<{ className?: string }> };
 type Group = { title: string; items: Item[] };
 
+// Pengelola Sistem Desa (peran ADMIN di basis data).
 const ADMIN: Group[] = [
   { title: "Ringkasan", items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutGrid }] },
   {
-    title: "Aset",
+    title: "Baterai",
     items: [
-      { href: "/baterai", label: "Baterai", icon: Battery },
+      { href: "/baterai", label: "Data Baterai", short: "Baterai", icon: Battery },
+      { href: "/penilaian", label: "Penilaian Baterai", short: "Penilaian", icon: ClipboardCheck },
+      { href: "/pencocokan", label: "Pencocokan Baterai", short: "Cocokkan", icon: ArrowLeftRight },
       { href: "/pemasok", label: "Pemasok", icon: Users },
     ],
   },
   {
-    title: "Analisis",
+    title: "Perencanaan",
     items: [
-      { href: "/penilaian", label: "Penilaian Baterai", short: "Penilaian", icon: ClipboardCheck },
       { href: "/perencana", label: "Perencana Desa", short: "Perencana", icon: SunMedium },
       { href: "/ketahanan", label: "Ketahanan Desa", short: "Ketahanan", icon: CloudRain },
-      { href: "/kompatibilitas", label: "Kompatibilitas", short: "Kompatibel", icon: PlugZap },
-      { href: "/siklus-hidup", label: "Siklus Hidup", short: "Siklus", icon: Recycle },
+      { href: "/kompatibilitas", label: "Kompatibilitas & Keselamatan", short: "Kompatibel", icon: PlugZap },
     ],
   },
   {
-    title: "Lainnya",
+    title: "Pemantauan",
     items: [
+      { href: "/siklus-hidup", label: "Siklus Hidup & Perawatan", short: "Siklus", icon: Recycle },
       { href: "/riwayat", label: "Riwayat", icon: History },
-      { href: "/pengaturan", label: "Pengaturan", icon: Settings },
     ],
   },
+  { title: "Pengaturan", items: [{ href: "/pengaturan", label: "Parameter Sistem", short: "Parameter", icon: Settings }] },
 ];
 
 const PEMASOK: Group[] = [
@@ -259,7 +262,14 @@ export function NavSkeleton() {
 
 export function LiveDot({ ok }: { ok: boolean }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1", ok ? "bg-leaf-50 text-leaf-700 ring-leaf-100" : "bg-flame-50 text-flame-600 ring-flame-100")}>
+    <span
+      className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1", ok ? "bg-leaf-50 text-leaf-700 ring-leaf-100" : "bg-flame-50 text-flame-600 ring-flame-100")}
+      title={
+        ok
+          ? "Layanan hitung berjalan: penilaian, perencanaan, simulasi, dan pemeriksaan dapat dijalankan."
+          : "Layanan hitung tidak dapat dihubungi: penilaian, perencanaan, simulasi, dan pemeriksaan tidak dapat dijalankan. Data tersimpan tetap dapat dilihat."
+      }
+    >
       <Activity className="size-3.5" />
       Mesin hitung {ok ? "aktif" : "tidak aktif"}
     </span>
