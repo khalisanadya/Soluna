@@ -9,14 +9,12 @@ import {
   Battery,
   PackagePlus as BatteryPlus,
   Building2,
-  ClipboardCheck,
   CloudRain,
   History,
   LayoutGrid,
   LogOut,
   MoreHorizontal,
   PlugZap,
-  Recycle,
   Settings,
   SunMedium,
   Users,
@@ -36,7 +34,6 @@ const ADMIN: Group[] = [
     title: "Baterai",
     items: [
       { href: "/baterai", label: "Data Baterai", short: "Baterai", icon: Battery },
-      { href: "/penilaian", label: "Penilaian Baterai", short: "Penilaian", icon: ClipboardCheck },
       { href: "/pencocokan", label: "Pencocokan Baterai", short: "Cocokkan", icon: ArrowLeftRight },
       { href: "/pemasok", label: "Pemasok", icon: Users },
     ],
@@ -51,10 +48,7 @@ const ADMIN: Group[] = [
   },
   {
     title: "Pemantauan",
-    items: [
-      { href: "/siklus-hidup", label: "Siklus Hidup & Perawatan", short: "Siklus", icon: Recycle },
-      { href: "/riwayat", label: "Riwayat", icon: History },
-    ],
+    items: [{ href: "/riwayat", label: "Riwayat", icon: History }],
   },
   { title: "Pengaturan", items: [{ href: "/pengaturan", label: "Parameter Sistem", short: "Parameter", icon: Settings }] },
 ];
@@ -71,7 +65,7 @@ const PEMASOK: Group[] = [
   { title: "Akun", items: [{ href: "/profil", label: "Profil Perusahaan", short: "Profil", icon: Building2 }] },
 ];
 
-const MOBILE_ADMIN = ["/dashboard", "/baterai", "/penilaian", "/ketahanan"];
+const MOBILE_ADMIN = ["/dashboard", "/baterai", "/pencocokan", "/ketahanan"];
 const MOBILE_PEMASOK = ["/dashboard", "/baterai", "/baterai/baru", "/profil"];
 
 function isActive(pathname: string, href: string, all: string[]) {

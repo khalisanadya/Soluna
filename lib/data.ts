@@ -16,6 +16,7 @@ export async function getBateraiForUser(user: CurrentUser, id: string) {
       pemasok: true,
       penilaian: { orderBy: { createdAt: "desc" }, include: { penilai: { select: { nama: true } } } },
       bacaanSoh: { orderBy: { tanggal: "asc" } },
+      asetDesa: true,
     },
   });
   if (!b) notFound();

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: { default: "SOLUNA", template: "%s · SOLUNA" },
   description:
-    "SOLUNA membantu pengelola desa menilai baterai bekas kendaraan listrik, merencanakan sistem surya, dan mensimulasikan ketahanan energi desa.",
+    "SOLUNA menghubungkan data assessment baterai pemasok dengan perencanaan sistem surya dan ketahanan energi desa.",
 };
 
 export const viewport: Viewport = {

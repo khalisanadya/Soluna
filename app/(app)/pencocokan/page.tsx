@@ -59,6 +59,7 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
       await prisma.baterai.findMany({
         select: {
           id: true,
+          kode: true,
           merek: true,
           model: true,
           kapasitasAwalKwh: true,
@@ -185,8 +186,8 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
 
                     <div className="flex flex-wrap gap-2 lg:flex-col lg:items-stretch">
                       {r.status === "belum_dinilai" ? (
-                        <Link href={`/penilaian/baru?baterai=${r.id}`} className={buttonClass("primary", "sm")}>
-                          Nilai baterai
+                        <Link href={`/baterai?q=${encodeURIComponent(b?.kode ?? "")}`} className={buttonClass("secondary", "sm")}>
+                          Menunggu assessment pemasok
                         </Link>
                       ) : r.daur_ulang ? (
                         <Link href="/siklus-hidup" className={buttonClass("secondary", "sm")}>

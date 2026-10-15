@@ -32,7 +32,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             Listrik yang terencana, dari baterai yang masih <span className="text-sun-400">layak.</span>
           </h2>
           <p className="mt-4 leading-relaxed text-ink-300">
-            Nilai baterai bekas kendaraan listrik, rancang sistem surya desa, dan uji ketahanannya saat cuaca buruk — dalam satu
+            Kelola assessment baterai pemasok, rancang sistem surya desa, dan uji ketahanannya saat cuaca buruk — dalam satu
             platform.
           </p>
           <ul className="mt-8 space-y-3">

@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, decodeSession } from "@/lib/session-token";
 
 const PUBLIC = ["/", "/masuk", "/daftar"];
-const ADMIN_ONLY = ["/pemasok", "/penilaian", "/perencana", "/ketahanan", "/kompatibilitas", "/siklus-hidup", "/riwayat", "/pengaturan"];
+// Assessment dan paspor adalah alur milik Pemasok; Admin hanya membacanya melalui Data Baterai.
+const ADMIN_ONLY = ["/pemasok", "/perencana", "/ketahanan", "/kompatibilitas", "/siklus-hidup", "/riwayat", "/pengaturan"];
 const PEMASOK_ONLY = ["/profil"];
 
 const under = (path: string, bases: string[]) => bases.some((b) => path === b || path.startsWith(b + "/"));

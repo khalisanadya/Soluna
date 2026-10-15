@@ -174,6 +174,22 @@ def plan(data: PlanInput, cfg: dict[str, Any]) -> dict[str, Any]:
         "rendah": liter * d["harga_per_liter_rendah"] / data.jumlah_rumah,
         "tinggi": liter * d["harga_per_liter_tinggi"] / data.jumlah_rumah,
     }
+    diesel_tahunan = {
+        level: diesel_per_rumah[level] * data.jumlah_rumah / faktor_periode
+        for level in ("rendah", "tinggi")
+    }
+    biaya_perawatan_tahunan = {
+        level: investasi[level] * cfg["perawatan_persen_per_tahun"]
+        for level in ("rendah", "tinggi")
+    }
+    penghematan_tahunan = {
+        "rendah": diesel_tahunan["rendah"] - biaya_perawatan_tahunan["tinggi"],
+        "tinggi": diesel_tahunan["tinggi"] - biaya_perawatan_tahunan["rendah"],
+    }
+    titik_impas = {
+        "rendah": investasi["rendah"] / penghematan_tahunan["tinggi"] if penghematan_tahunan["tinggi"] > 0 else None,
+        "tinggi": investasi["tinggi"] / penghematan_tahunan["rendah"] if penghematan_tahunan["rendah"] > 0 else None,
+    }
     L.append(step("Biaya sistem per rumah per periode",
                   "(investasi / umur sistem + perawatan tahunan) × (periode / 365) / jumlah rumah",
                   f"investasi Rp{fmt(investasi['rendah'], 0)}–Rp{fmt(investasi['tinggi'], 0)}, umur {cfg['umur_sistem_tahun']} tahun",
@@ -220,6 +236,7 @@ def plan(data: PlanInput, cfg: dict[str, Any]) -> dict[str, Any]:
             "sistem_per_rumah": {k: r(v, 0) for k, v in sistem_per_rumah.items()},
             "diesel_per_rumah": {k: r(v, 0) for k, v in diesel_per_rumah.items()},
             "iuran_perawatan_per_rumah_bulan": {k: r(v, 0) for k, v in iuran.items()},
+            "titik_impas_tahun": {k: r(v, 1) if v is not None else None for k, v in titik_impas.items()},
             "periode_hari": data.periode_hari,
         },
         "nilai_bawaan": bawaan,

@@ -77,6 +77,9 @@ export function AssessmentForm({ daftar, initial, terpilih }: { daftar: { id: st
         </Notice>
       )}
 
+      <Notice tone="info" className="mb-4" title="Hasil dihitung model baterai terlatih">
+        Formulir ini hanya menerima data uji dari pemasok. Aplikasi tidak menghitung atau mengisi sisa umur secara manual; hasil SoH, grade, confidence, sisa umur, dan paspor diambil dari layanan model yang dikonfigurasi melalui ENV.
+      </Notice>
       <Card className="!p-0">
         <Bagian icon={<BatteryCharging className="size-4" />} judul="Baterai" keterangan="Data dari pemasok terisi otomatis setelah baterai dipilih.">
           <Field label="Baterai yang dinilai" htmlFor="bateraiId" error={err("bateraiId")} required>

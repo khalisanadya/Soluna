@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ClipboardCheck, Pencil, ScrollText } from "lucide-react";
 import { TrendLine } from "@/components/charts";
-import { ButtonLink, Card, EmptyState, GradeBadge, IlustrasiTag, KeyValue, Notice, PageHeader, Progress, SectionTitle, gradeTone } from "@/components/ui";
+import { ButtonLink, Card, EmptyState, GradeBadge, KeyValue, Notice, PageHeader, Progress, SectionTitle, gradeTone } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
 import { getBateraiForUser } from "@/lib/data";
-import { num, rentangUmur, tanggal, umur } from "@/lib/format";
+import { num, tanggal } from "@/lib/format";
 import type { Grade, HasilPenilaian } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Detail Baterai" };
@@ -25,7 +25,7 @@ export default async function DetailBateraiPage({ params, searchParams }: PagePr
   return (
     <>
       <PageHeader
-        eyebrow={<>Baterai {b.ilustrasi && <IlustrasiTag />}</>}
+        eyebrow="Baterai"
         title={
           <span className="flex items-center gap-3">
             <span className="num">{b.kode}</span>
@@ -35,17 +35,15 @@ export default async function DetailBateraiPage({ params, searchParams }: PagePr
         description={`${b.merek} ${b.model} · ${b.jenisKimia} · ${num(b.kapasitasAwalKwh)} kWh`}
         actions={
           <>
-            <ButtonLink href={`/baterai/${b.id}/ubah`} variant="secondary">
-              <Pencil className="size-4" /> Ubah
-            </ButtonLink>
+            {!isAdmin && <ButtonLink href={`/baterai/${b.id}/ubah`} variant="secondary"><Pencil className="size-4" /> Ubah</ButtonLink>}
             {latest && (
               <ButtonLink href={`/penilaian/${latest.id}`} variant="secondary">
                 <ScrollText className="size-4" /> Paspor
               </ButtonLink>
             )}
-            {isAdmin && (
+            {!isAdmin && (
               <ButtonLink href={`/penilaian/baru?baterai=${b.id}`}>
-                <ClipboardCheck className="size-4" /> {latest ? "Nilai ulang" : "Nilai baterai"}
+                <ClipboardCheck className="size-4" /> {latest ? "Nilai ulang baterai" : "Nilai baterai"}
               </ButtonLink>
             )}
           </>
@@ -72,11 +70,6 @@ export default async function DetailBateraiPage({ params, searchParams }: PagePr
                   <Progress value={latest.soh} className="mt-2" color={gradeTone[latest.grade as Grade].bg} />
                 </div>
                 <div>
-                  <p className="text-xs text-ink-500">Perkiraan sisa umur</p>
-                  <p className="num mt-1 text-2xl">{rentangUmur(latest.sisaUmurBawah, latest.sisaUmurAtas)}</p>
-                  <p className="text-xs text-ink-500">paling mungkin {umur(latest.sisaUmurTengah)}</p>
-                </div>
-                <div>
                   <p className="text-xs text-ink-500">Keyakinan</p>
                   <p className="num mt-1 text-2xl">{num(latest.keyakinan, 0)}%</p>
                   <p className="text-xs text-ink-500">dinilai {tanggal(latest.createdAt)}</p>
@@ -96,7 +89,7 @@ export default async function DetailBateraiPage({ params, searchParams }: PagePr
               <div>
                 <p className="font-semibold">Belum dinilai</p>
                 <p className="text-sm text-ink-600">
-                  {isAdmin ? "Nilai baterai ini untuk menerbitkan paspor baterai." : "Pengelola desa akan menilai baterai ini. Status akan berubah setelah penilaian."}
+                  {isAdmin ? "Menunggu penilaian pemasok. Admin Desa hanya dapat melihat data ini." : "Assessment pemasok akan menerbitkan paspor baterai. Status akan berubah setelah penilaian."}
                 </p>
               </div>
             </Card>
@@ -144,7 +137,6 @@ export default async function DetailBateraiPage({ params, searchParams }: PagePr
                 ["Kapasitas awal", `${num(b.kapasitasAwalKwh)} kWh`],
                 ["Tegangan nominal", b.teganganNominalV ? `${num(b.teganganNominalV)} V` : "—"],
                 ["Usia pemakaian", b.usiaTahun !== null ? `${num(b.usiaTahun)} tahun` : "—"],
-                ["Jumlah siklus", b.jumlahSiklus !== null ? num(b.jumlahSiklus, 0) : "—"],
                 ["Kondisi", b.kondisi],
                 ["Didaftarkan", tanggal(b.createdAt)],
               ]}

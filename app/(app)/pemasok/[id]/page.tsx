@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Building2, MapPin, Warehouse } from "lucide-react";
 import { Paginasi, potong } from "@/components/paginasi";
-import { Badge, ButtonLink, Card, EmptyState, GradeBadge, PageHeader, SectionTitle, SohBadge } from "@/components/ui";
+import { Badge, Card, EmptyState, GradeBadge, PageHeader, SectionTitle, SohBadge } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
 import { num, tanggal } from "@/lib/format";
@@ -97,9 +97,6 @@ export default async function DetailPemasokPage({ params, searchParams }: PagePr
                     <span className="hidden w-24 justify-center sm:flex">
                       {b.status === "DINILAI" ? <SohBadge soh={b.sohTerakhir} tinggi={cfg.grade.A} rendah={cfg.grade.C} /> : <Badge tone="sun">Belum dinilai</Badge>}
                     </span>
-                    <ButtonLink href={`/penilaian/baru?baterai=${b.id}`} size="sm" variant={b.status === "DINILAI" ? "secondary" : "dark"} className="w-28 shrink-0">
-                      {b.status === "DINILAI" ? "Nilai ulang" : "Nilai"}
-                    </ButtonLink>
                   </li>
                 ))}
               </ul>

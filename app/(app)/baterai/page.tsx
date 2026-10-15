@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import type { Prisma } from "@prisma/client";
 import { BatteryCharging, ChevronRight, Plus } from "lucide-react";
-import { Badge, ButtonLink, Card, EmptyState, GradeBadge, IlustrasiTag, PageHeader, SohBadge } from "@/components/ui";
+import { Badge, ButtonLink, Card, EmptyState, GradeBadge, PageHeader, SohBadge } from "@/components/ui";
 import { Paginasi, bacaHalaman } from "@/components/paginasi";
 import { requireUser } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
@@ -12,17 +12,23 @@ import { num } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { JENIS_KIMIA } from "@/lib/wilayah";
 import { FilterForm } from "./filter-form";
+import { AdminBatteryLookup } from "./admin-lookup";
 
 export const metadata: Metadata = { title: "Baterai" };
 
 export default async function BateraiPage({ searchParams }: PageProps<"/baterai">) {
   const user = await requireUser();
   const sp = await searchParams;
+  if (user.peran === "ADMIN") {
+    const query = typeof sp.q === "string" ? sp.q.trim() : "";
+    const message = typeof sp.pesan === "string" ? sp.pesan : undefined;
+    return <AdminBatteryLookup query={query} message={message} />;
+  }
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   const status = sp.status === "DINILAI" || sp.status === "BELUM_DINILAI" ? sp.status : "";
   const grade = typeof sp.grade === "string" && ["A", "B", "C", "D"].includes(sp.grade) ? sp.grade : "";
   const kimia = typeof sp.kimia === "string" ? sp.kimia : "";
-  const pemasokId = user.peran === "ADMIN" && typeof sp.pemasok === "string" ? sp.pemasok : "";
+  const pemasokId = "";
 
   const where: Prisma.BateraiWhereInput = {
     ...bateraiScope(user),
@@ -51,12 +57,15 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
       orderBy: { kode: "asc" },
       skip,
       take,
-      include: { pemasok: { select: { id: true, namaPerusahaan: true } } },
+      include: {
+        pemasok: { select: { id: true, namaPerusahaan: true } },
+        penilaian: { orderBy: { createdAt: "desc" }, take: 1, select: { id: true } },
+      },
     }),
-    user.peran === "ADMIN" ? prisma.pemasok.findMany({ orderBy: { namaPerusahaan: "asc" }, select: { id: true, namaPerusahaan: true } }) : [],
+    [],
   ]);
   const filtered = Boolean(q || status || grade || kimia || pemasokId);
-  const isAdmin = user.peran === "ADMIN";
+  const isAdmin = false;
   const { data: cfg } = await getActiveConfig();
 
   return (
@@ -106,7 +115,6 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                       <Link href={`/baterai/${b.id}`} className="num font-semibold hover:underline">
                         {b.kode}
                       </Link>
-                      {b.ilustrasi && <IlustrasiTag className="ml-2" />}
                     </td>
                     <td className="px-3 py-3">
                       <span className="block font-medium">
@@ -134,13 +142,20 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                     </td>
                     <td className="px-5 py-3 text-right">
                       {isAdmin ? (
-                        <ButtonLink href={`/penilaian/baru?baterai=${b.id}`} size="sm" variant={b.status === "DINILAI" ? "secondary" : "dark"}>
-                          {b.status === "DINILAI" ? "Nilai ulang" : "Nilai"}
+                        <ButtonLink href={`/baterai/${b.id}`} size="sm" variant="secondary">
+                          {b.status === "DINILAI" ? "Lihat assessment" : "Menunggu pemasok"}
                         </ButtonLink>
                       ) : (
-                        <Link href={`/baterai/${b.id}`} className="text-ink-400 group-hover:text-ink-900">
-                          <ChevronRight className="ml-auto size-4" />
-                        </Link>
+                        <div className="flex items-center justify-end gap-2">
+                          {b.penilaian[0] && (
+                            <ButtonLink href={`/penilaian/${b.penilaian[0].id}`} size="sm" variant="secondary">
+                              Paspor
+                            </ButtonLink>
+                          )}
+                          <Link href={`/baterai/${b.id}`} className="text-ink-400 group-hover:text-ink-900">
+                            <ChevronRight className="ml-auto size-4" />
+                          </Link>
+                        </div>
                       )}
                     </td>
                   </tr>

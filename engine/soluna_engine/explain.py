@@ -35,6 +35,13 @@ def _num(v: Any, digits: int = 1) -> str:
 def template(jenis: str, h: dict[str, Any]) -> str:
     if jenis == "penilaian":
         su = h["sisa_umur"]
+        if su.get("satuan") == "siklus":
+            return (
+                f"Baterai ini memiliki SoH {_num(h['soh'])}% dan masuk grade {h['grade']}. "
+                f"Perkiraan sisa umur model adalah {_num(su['bawah'], 0)} sampai {_num(su['atas'], 0)} siklus, "
+                f"dengan nilai tengah {_num(su['tengah'], 0)} siklus. "
+                f"Skor keyakinan model adalah {_num(h['keyakinan'])}%."
+            )
         return (
             f"Baterai ini masih menyimpan {_num(h['soh'])}% dari kapasitas awalnya, sehingga masuk grade {h['grade']}. "
             f"Keputusan pemanfaatannya: {h['keputusan'].lower()}. "

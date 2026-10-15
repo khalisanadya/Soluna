@@ -28,7 +28,7 @@ async function PemasokDashboard({ user }: { user: CurrentUser }) {
     <>
       <PageHeader
         eyebrow={pemasok?.namaPerusahaan ?? "Pemasok"}
-        description="Daftarkan baterai pensiun Anda dan pantau status penilaiannya oleh pengelola desa."
+        description="Daftarkan baterai bekas, lakukan assessment, dan terbitkan paspor baterai untuk digunakan desa."
         actions={
           <ButtonLink href="/baterai/baru">
             <BatteryPlus className="size-4" /> Tambah baterai
@@ -62,7 +62,7 @@ async function PemasokDashboard({ user }: { user: CurrentUser }) {
               ))}
             </ul>
           ) : (
-            <EmptyState title="Belum ada baterai" description="Tambahkan baterai pensiun pertama Anda untuk dinilai." action={<ButtonLink href="/baterai/baru">Tambah baterai</ButtonLink>} />
+            <EmptyState title="Belum ada baterai" description="Tambahkan baterai pertama, lalu lakukan assessment untuk menerbitkan paspor." action={<ButtonLink href="/baterai/baru">Tambah baterai</ButtonLink>} />
           )}
         </Card>
         <GradeDistribution counts={counts} />

@@ -7,10 +7,13 @@ import {
   ClipboardCheck,
   Clock3,
   CloudRain,
+  Fuel,
+  Home,
   PlugZap,
   Recycle,
   SunMedium,
   XCircle,
+  Wrench,
 } from "lucide-react";
 import { Badge, ButtonLink, Card, EmptyState, GradeBadge, IlustrasiTag, Notice, PageHeader, Progress, SectionTitle, Stat } from "@/components/ui";
 import { analisisSiklus, bateraiDinilaiUntukSiklus, kompatTerakhir } from "@/lib/analisis";
@@ -27,7 +30,7 @@ import type { HasilKetahanan, HasilKompatibilitas, HasilRencana, Rentang } from 
    SOLUNA belum menerima data pengukuran aktual (telemetri), jadi tidak ada angka "aktual". */
 
 export async function AdminDashboard() {
-  const [mesinAktif, belumDinilai, counts, dinilai, kompat, rencana, { versi }] = await Promise.all([
+  const [mesinAktif, belumDinilai, counts, dinilai, kompat, rencana, { versi }, asetCounts] = await Promise.all([
     engineHealth(),
     prisma.baterai.findMany({
       where: { status: "BELUM_DINILAI" },
@@ -39,6 +42,7 @@ export async function AdminDashboard() {
     kompatTerakhir(),
     prisma.rencanaDesa.findFirst({ orderBy: { createdAt: "desc" } }),
     getActiveConfig(),
+    prisma.asetBaterai.groupBy({ by: ["status"], _count: { _all: true } }),
   ]);
   const [siklus, simulasi, aktivitas] = await Promise.all([
     dinilai.length ? analisisSiklus(dinilai) : null,
@@ -51,6 +55,7 @@ export async function AdminDashboard() {
   const siklusOk = siklus?.ok ? siklus.data : null;
   const daurUlang = siklusOk ? siklusOk.ringkasan.daur_ulang : counts.D;
   const layak = counts.A + counts.B + counts.C;
+  const aset = Object.fromEntries(asetCounts.map((row) => [row.status, row._count._all])) as Partial<Record<"AKAN_DIBELI" | "TERDAFTAR" | "DIGUNAKAN" | "TIDAK_TERSEDIA", number>>;
 
   // Tindak lanjut, dikelompokkan menurut jenis pekerjaan (bukan diberi skor prioritas).
   const perluTindakan: TindakLanjut[] = [
@@ -61,7 +66,7 @@ export async function AdminDashboard() {
       jenis: "Belum dinilai",
       tone: "neutral" as const,
       alasan: `${b.merek} ${b.model} dari ${b.pemasok.namaPerusahaan}, masuk ${tanggal(b.createdAt)}.`,
-      aksi: { label: "Nilai", href: `/penilaian/baru?baterai=${b.id}` },
+      aksi: { label: "Cari", href: `/baterai?q=${encodeURIComponent(b.kode)}` },
     })),
     ...(siklusOk?.baterai ?? [])
       .filter((r) => r.status === "daur_ulang" || r.status === "perhatian")
@@ -103,11 +108,11 @@ export async function AdminDashboard() {
       <PageHeader
         eyebrow={new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date())}
         title="Dashboard Pengelola Sistem Desa"
-        description="Pantau kondisi baterai dan kelola kebutuhan energi desa."
+        description="Kelola energi desa, biaya operasional, dan baterai pemasok yang akan digunakan di desa."
         actions={
           <>
-            <ButtonLink href="/pencocokan" variant="secondary">
-              <BatteryCharging className="size-4" /> Pencocokan baterai
+            <ButtonLink href="/baterai" variant="secondary">
+              <BatteryCharging className="size-4" /> Tambah / Cari baterai
             </ButtonLink>
             <ButtonLink href="/perencana">
               <SunMedium className="size-4" /> Rencana baru
@@ -123,6 +128,18 @@ export async function AdminDashboard() {
         </Notice>
       )}
 
+      {rencana ? <RingkasanPengelolaan hasil={rencana.hasil as unknown as HasilRencana} namaDesa={rencana.namaDesa} jumlahRumah={(rencana.masukan as { jumlah_rumah?: number }).jumlah_rumah} /> : (
+        <Card className="mb-4 border-dashed">
+          <SectionTitle title="Profil energi desa belum tersedia" />
+          <p className="text-sm text-ink-600">Buat rencana desa untuk melihat kebutuhan energi, penghematan diesel, iuran, dan titik impas.</p>
+          <ButtonLink href="/perencana" className="mt-3">Buat rencana desa</ButtonLink>
+        </Card>
+      )}
+
+      <div className="mb-4 flex items-center gap-2">
+        <h2 className="text-lg font-semibold">Pemantauan baterai</h2>
+        <span className="text-xs text-ink-500">Data pemasok dan aset desa</span>
+      </div>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Stat
           label="Menunggu penilaian"
@@ -131,7 +148,7 @@ export async function AdminDashboard() {
           icon={<Clock3 className="size-4" />}
           accent="sun"
           hint="Dari pemasok"
-          href="/penilaian"
+          href="/baterai"
         />
         <Stat
           label="Layak dipakai ulang"
@@ -161,6 +178,16 @@ export async function AdminDashboard() {
           href="/siklus-hidup"
         />
       </div>
+
+      <Card className="mt-4">
+        <SectionTitle title="Status aset baterai desa" action={<ButtonLink href="/baterai" size="sm" variant="secondary">Cari nomor seri</ButtonLink>} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Angka label="Akan dibeli" nilai={String(aset.AKAN_DIBELI ?? 0)} detail="dari pemasok" />
+          <Angka label="Terdaftar" nilai={String(aset.TERDAFTAR ?? 0)} detail="siap dipertimbangkan" />
+          <Angka label="Digunakan di desa" nilai={String(aset.DIGUNAKAN ?? 0)} detail="aset aktif" />
+          <Angka label="Tidak tersedia" nilai={String(aset.TIDAK_TERSEDIA ?? 0)} detail="tidak dapat dipakai" />
+        </div>
+      </Card>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2">
@@ -309,6 +336,36 @@ function Angka({ label, nilai, detail }: { label: string; nilai: string; detail:
         {detail}
       </p>
     </div>
+  );
+}
+
+function RingkasanPengelolaan({ hasil, namaDesa, jumlahRumah }: { hasil: HasilRencana; namaDesa: string; jumlahRumah?: number }) {
+  const r = hasil.ringkasan;
+  const b = hasil.biaya;
+  const impas = b.titik_impas_tahun;
+  return (
+    <Card className="mb-4">
+      <SectionTitle
+        title="Ringkasan pengelolaan desa"
+        hint="Berdasarkan rencana energi terakhir"
+        action={<Link href="/perencana" className="text-sm font-semibold text-sun-700 hover:underline">Kelola rencana</Link>}
+      />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Angka label="Rumah terlayani" nilai={jumlahRumah ? num(jumlahRumah, 0) : "—"} detail={`${num(r.kebutuhan_harian_kwh)} kWh kebutuhan harian`} />
+        <Angka label="Penghematan diesel" nilai={`${num(hasil.lingkungan.diesel_hemat_liter, 0)} liter`} detail={`selama ${hasil.lingkungan.periode_hari} hari`} />
+        <Angka label="Iuran perawatan" nilai={rentang(b.iuran_perawatan_per_rumah_bulan)} detail="per rumah setiap bulan" />
+        <Angka
+          label="Titik impas"
+          nilai={impas && impas.rendah !== null && impas.tinggi !== null ? `${num(impas.rendah, 1)}–${num(impas.tinggi, 1)} th` : "Belum dihitung"}
+          detail={impas ? "dibandingkan biaya diesel" : "buat ulang rencana untuk menghitung"}
+        />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-ink-100 pt-3 text-sm text-ink-600">
+        <span className="inline-flex items-center gap-2"><Home className="size-4 text-sun-700" /> Desa: {namaDesa}</span>
+        <span className="inline-flex items-center gap-2"><Fuel className="size-4 text-flame-500" /> Setara biaya diesel: {rentang(b.diesel_per_rumah)} / rumah / {b.periode_hari} hari</span>
+        <span className="inline-flex items-center gap-2"><Wrench className="size-4 text-ink-500" /> {r.jumlah_paket} paket baterai · {num(r.kapasitas_panel_terpasang_kwp)} kWp surya</span>
+      </div>
+    </Card>
   );
 }
 

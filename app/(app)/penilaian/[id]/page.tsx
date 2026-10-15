@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalendarClock, ClipboardCheck, Gauge, Hourglass, PlugZap, Recycle, ShieldCheck } from "lucide-react";
+import { ClipboardCheck, Gauge, PlugZap, Recycle, ShieldCheck } from "lucide-react";
 import { PrintButton } from "@/components/print-button";
-import { Badge, ButtonLink, GradeBadge, IlustrasiTag, Logo, Notice, PageHeader, gradeTone, tingkatSoh } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { Badge, ButtonLink, GradeBadge, Logo, Notice, PageHeader, gradeTone, tingkatSoh } from "@/components/ui";
+import { requireUser } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
-import { bulanTahun, cn, num, rentangUmur, tanggal, umur } from "@/lib/format";
+import { cn, num, tanggal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { Grade, HasilKompatibilitas, HasilPenilaian } from "@/lib/types";
 
@@ -15,13 +16,12 @@ export const metadata: Metadata = { title: "Paspor Baterai" };
 const kompatTone = { layak: "leaf", perlu_penyesuaian: "amber", tidak_layak: "flame" } as const;
 
 export default async function PasporPage({ params, searchParams }: PageProps<"/penilaian/[id]">) {
-  await requireAdmin();
+  const user = await requireUser();
   const { id } = await params;
   const sp = await searchParams;
-  const p = await prisma.penilaian.findUnique({
-    where: { id },
+  const p = await prisma.penilaian.findFirst({
+    where: { id, ...(user.peran === "PEMASOK" ? { baterai: { pemasokId: user.pemasokId! } } : {}) },
     include: {
-      penilai: { select: { nama: true } },
       baterai: { include: { pemasok: true, cekKompat: { orderBy: { createdAt: "desc" }, take: 1 } } },
     },
   });
@@ -34,28 +34,51 @@ export default async function PasporPage({ params, searchParams }: PageProps<"/p
   const { data: cfg } = await getActiveConfig();
   const soh = tingkatSoh(h.soh, cfg.grade.A, cfg.grade.C);
   const nomor = `SLN-${b.kode.replace("BAT-", "")}-${p.createdAt.toISOString().slice(0, 10).replaceAll("-", "")}`;
+  const penilaianItems: [string, ReactNode][] = [
+    ["Tanggal", tanggal(p.createdAt)],
+    ["Penerbit paspor", b.pemasok.namaPerusahaan],
+    ["Model", h.model?.versi ?? p.versiModel ?? "—"],
+    ...(user.peran === "ADMIN"
+      ? [
+          [
+            "Kompatibilitas",
+            kompat ? (
+              <Badge tone={kompatTone[kompat.status]}>{kompat.label}</Badge>
+            ) : (
+              <Link href={`/kompatibilitas?baterai=${b.id}`} className="font-medium text-sun-700 hover:underline">
+                Belum dicek
+              </Link>
+            ),
+          ] as [string, ReactNode],
+        ]
+      : []),
+  ];
 
   return (
     <>
       <PageHeader
-        eyebrow={<>Baterai {b.ilustrasi && <IlustrasiTag />}</>}
+        eyebrow="Baterai"
         title="Paspor baterai"
-        description="Ringkasan kesehatan, perkiraan sisa umur, dan keputusan pemanfaatan baterai."
+        description="Ringkasan kesehatan, hasil penilaian model, dan keputusan pemanfaatan baterai."
         actions={
           <>
             <PrintButton />
-            <ButtonLink href={`/kompatibilitas?baterai=${b.id}`} variant="secondary" className="print:hidden">
-              <PlugZap className="size-4" /> Cek kompatibilitas
-            </ButtonLink>
-            <ButtonLink href={`/penilaian/baru?baterai=${b.id}`} className="print:hidden">
-              <ClipboardCheck className="size-4" /> Nilai ulang
-            </ButtonLink>
+            {user.peran === "ADMIN" && (
+              <ButtonLink href={`/kompatibilitas?baterai=${b.id}`} variant="secondary" className="print:hidden">
+                <PlugZap className="size-4" /> Cek kompatibilitas
+              </ButtonLink>
+            )}
+            {user.peran === "PEMASOK" && (
+              <ButtonLink href={`/penilaian/baru?baterai=${b.id}`} className="print:hidden">
+                <ClipboardCheck className="size-4" /> Nilai ulang baterai
+              </ButtonLink>
+            )}
           </>
         }
       />
       {sp.baru && (
         <Notice tone="success" className="mx-auto mb-4 max-w-4xl print:hidden" title="Penilaian tersimpan">
-          Paspor baterai {b.kode} diterbitkan dan status baterai diperbarui.
+          Paspor baterai {b.kode} diterbitkan oleh pemasok dan status baterai diperbarui.
         </Notice>
       )}
 
@@ -96,7 +119,7 @@ export default async function PasporPage({ params, searchParams }: PageProps<"/p
         )}
 
         {/* Hasil utama */}
-        <section className="grid grid-cols-2 border-y border-ink-100 lg:grid-cols-4">
+        <section className="grid grid-cols-2 border-y border-ink-100">
           <Hasil icon={<Gauge className="size-3.5" />} label="Kesehatan (SoH)">
             <p className="num text-3xl">
               {num(h.soh)}
@@ -106,14 +129,7 @@ export default async function PasporPage({ params, searchParams }: PageProps<"/p
               <span className={`size-1.5 rounded-full ${soh.dot}`} /> {soh.label}
             </span>
           </Hasil>
-          <Hasil icon={<Hourglass className="size-3.5" />} label="Perkiraan sisa umur" className="border-l border-ink-100">
-            <p className="num text-xl leading-tight font-semibold">{rentangUmur(h.sisa_umur.bawah, h.sisa_umur.atas)}</p>
-            <p className="mt-1 text-xs text-ink-500">paling mungkin {umur(h.sisa_umur.tengah)}</p>
-          </Hasil>
-          <Hasil icon={<CalendarClock className="size-3.5" />} label="Perkiraan penggantian" className="border-t border-ink-100 lg:border-t-0 lg:border-l">
-            <p className="text-xl leading-tight font-semibold">{h.penggantian.segera ? "Segera" : bulanTahun(h.penggantian.tengah)}</p>
-          </Hasil>
-          <Hasil icon={<ShieldCheck className="size-3.5" />} label="Keyakinan" className="border-t border-l border-ink-100 lg:border-t-0">
+          <Hasil icon={<ShieldCheck className="size-3.5" />} label="Keyakinan" className="border-l border-ink-100">
             <p className="num text-3xl">
               {num(h.keyakinan, 0)}
               <span className="text-base text-ink-400">%</span>
@@ -130,30 +146,16 @@ export default async function PasporPage({ params, searchParams }: PageProps<"/p
               ["Kapasitas sehat", `${num((b.kapasitasAwalKwh * h.soh) / 100)} kWh`],
               ["Tegangan nominal", b.teganganNominalV ? `${num(b.teganganNominalV)} V` : "—"],
               ["Usia pemakaian", b.usiaTahun !== null ? `${num(b.usiaTahun)} tahun` : "—"],
-              ["Jumlah siklus", b.jumlahSiklus !== null ? num(b.jumlahSiklus, 0) : "—"],
             ]}
           />
           <Daftar
             judul="Penilaian"
-            items={[
-              ["Tanggal", tanggal(p.createdAt)],
-              ["Penilai", p.penilai.nama],
-              [
-                "Kompatibilitas",
-                kompat ? (
-                  <Badge tone={kompatTone[kompat.status]}>{kompat.label}</Badge>
-                ) : (
-                  <Link href={`/kompatibilitas?baterai=${b.id}`} className="font-medium text-sun-700 hover:underline">
-                    Belum dicek
-                  </Link>
-                ),
-              ],
-            ]}
+            items={penilaianItems}
           />
         </section>
 
         <footer className="border-t border-ink-100 px-6 py-4 text-xs text-ink-500 sm:px-8">
-          Hasil ini estimasi berdasarkan data uji yang dimasukkan, bukan sertifikasi. Sisa umur bukan tanggal kerusakan pasti.
+          Hasil ini estimasi berdasarkan data uji yang dimasukkan, bukan sertifikasi.
         </footer>
       </article>
 

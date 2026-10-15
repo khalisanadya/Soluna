@@ -18,6 +18,13 @@ enum StatusPenilaian {
   DINILAI
 }
 
+enum StatusAsetBaterai {
+  AKAN_DIBELI
+  TERDAFTAR
+  DIGUNAKAN
+  TIDAK_TERSEDIA
+}
+
 enum JenisBerkas {
   FOTO
   DOKUMEN
@@ -43,6 +50,7 @@ model User {
   simulasi    SimulasiKetahanan[]
   bacaanSoh   BacaanSoh[]
   konfigurasi Konfigurasi[]
+  asetBaterai AsetBaterai[]
 }
 
 model Pemasok {
@@ -93,8 +101,22 @@ model Baterai {
   penilaian Penilaian[]
   bacaanSoh BacaanSoh[]
   cekKompat CekKompatibilitas[]
+  asetDesa AsetBaterai?
 
   @@index([pemasokId])
+}
+
+model AsetBaterai {
+  id        String            @id @default(cuid())
+  bateraiId String            @unique
+  baterai   Baterai           @relation(fields: [bateraiId], references: [id], onDelete: Cascade)
+  adminId   String
+  admin     User              @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  status    StatusAsetBaterai @default(TERDAFTAR)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([adminId, status])
 }
 
 model BerkasBaterai {
@@ -120,9 +142,12 @@ model Penilaian {
   soh           Float
   grade         String
   keputusan     String
-  sisaUmurBawah Float
-  sisaUmurTengah Float
-  sisaUmurAtas  Float
+  sisaUmurBawah Float?
+  sisaUmurTengah Float?
+  sisaUmurAtas Float?
+  sisaUmurSiklusBawah Int?
+  sisaUmurSiklusTengah Int?
+  sisaUmurSiklusAtas Int?
   keyakinan     Float
   tanggalGanti  DateTime?
   penjelasan    Json?

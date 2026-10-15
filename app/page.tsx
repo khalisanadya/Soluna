@@ -121,7 +121,7 @@ export default function Landing() {
               </span>
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-ink-600">
-              SOLUNA membantu pengelola desa menilai baterai bekas kendaraan listrik, merancang sistem surya, dan memastikan listrik
+              SOLUNA menghubungkan assessment baterai dari pemasok dengan perencanaan sistem surya desa dan ketahanan energi
               untuk kebutuhan penting tetap tersedia saat cuaca buruk.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">

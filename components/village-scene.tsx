@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { BatteryCharging, Cloud, CloudRain, Fuel, House, Moon, Sun, SunMedium, X } from "lucide-react";
+import { Cloud, CloudRain, Moon, Sun, X } from "lucide-react";
 import { cn, num } from "@/lib/format";
 
 /* =====================================================================================
@@ -278,20 +278,11 @@ export function VillageScene({ className }: { className?: string }) {
                 )}
               >
                 <I className={cn("size-3.5", on && c === "cerah" && "text-sun-400")} />
-                <span className={cn(!on && "sr-only sm:not-sr-only")}>{CUACA[c].label}</span>
+                <span className="sr-only">{CUACA[c].label}</span>
               </button>
             );
           })}
         </div>
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide uppercase ring-1 backdrop-blur transition-colors",
-            malam ? "bg-white/10 text-ink-200 ring-white/20" : "bg-white/70 text-ink-500 ring-ink-200",
-          )}
-          title="Angka pada ilustrasi ini berasal dari simulasi sederhana, bukan pemantauan perangkat nyata."
-        >
-          <span className="size-1.5 animate-pulse-soft rounded-full bg-zest-400" /> Simulasi · bukan data real-time
-        </span>
       </div>
 
       <div ref={stageRef} className="relative -mt-2 sm:-mt-14" onClick={() => setPinned(null)}>
@@ -472,64 +463,6 @@ export function VillageScene({ className }: { className?: string }) {
           </g>
         </svg>
 
-        {/* ---------- Label status (desktop/tablet) ---------- */}
-        <div className="pointer-events-none absolute inset-0 hidden sm:block">
-          <Chip at={[236, 132]} t="panel" active={active} onPick={pick} onHover={setHover} icon={<SunMedium className="size-4" />} tone="sun" label="Surya" value={`${num(f.surya)} kW`} sub={`dari ${PV_KWP} kWp`} />
-          <Chip at={[690, 236]} t="baterai" active={active} onPick={pick} onHover={setHover} icon={<BatteryCharging className="size-4" />} tone="leaf" label={`Baterai ${num(sim.soc, 0)}%`} value={bateraiMode[0].toUpperCase() + bateraiMode.slice(1)} sub={`${num((sim.soc / 100) * BATERAI_KWH)} kWh tersimpan`} />
-          <Chip at={[128, 476]} t="rumah" active={active} onPick={pick} onHover={setHover} icon={<House className="size-4" />} tone="ink" label="Beban desa" value={`${num(f.beban)} kW`} sub={f.lepas ? "kenyamanan dilepas" : "semua beban menyala"} />
-          <Chip at={[660, 470]} t="genset" active={active} onPick={pick} onHover={setHover} icon={<Fuel className="size-4" />} tone="flame" label="Genset" value={f.genset ? "Menyala" : "Siaga"} sub={f.genset ? `${num(GENSET_KW)} kW cadangan` : "cadangan otomatis"} />
-        </div>
-
-        {/* ---------- Tooltip mengambang (desktop/tablet) ---------- */}
-        {info && anchor && <Tooltip key={active} anchor={anchor} box={box} info={info} pinned={pinned === active} onClose={() => setPinned(null)} />}
-      </div>
-
-      {/* ---------- Legenda ---------- */}
-      <div className={cn("relative z-10 flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pb-3 text-[0.7rem]", malam ? "text-ink-300" : "text-ink-500")}>
-        <span>Aliran daya berwarna sesuai sumbernya:</span>
-        {[
-          ["Surya", ENERGI.surya],
-          ["Baterai", ENERGI.baterai],
-          ["Genset", ENERGI.genset],
-        ].map(([t, c]) => (
-          <span key={t} className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full" style={{ background: c }} /> {t}
-          </span>
-        ))}
-        <span className="ml-auto hidden md:inline">Arahkan kursor atau klik komponen untuk detail</span>
-      </div>
-
-      {/* ---------- Ringkasan & detail (ponsel): ketuk untuk melihat ---------- */}
-      <div className="relative z-10 border-t border-ink-200/70 bg-white/90 p-3 backdrop-blur sm:hidden">
-        <div className="grid grid-cols-4 gap-1.5">
-          {(
-            [
-              ["panel", "Surya", `${num(f.surya)} kW`, SunMedium, "text-sun-600"],
-              ["baterai", "Baterai", `${num(sim.soc, 0)}%`, BatteryCharging, "text-leaf-600"],
-              ["rumah", "Beban", `${num(f.beban)} kW`, House, "text-ink-700"],
-              ["genset", "Genset", f.genset ? "Aktif" : "Siaga", Fuel, "text-flame-600"],
-            ] as const
-          ).map(([t, l, v, I, c]) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => pick(t)}
-              aria-pressed={pinned === t}
-              className={cn("rounded-xl px-1.5 py-2 text-center ring-1 transition", pinned === t ? "bg-ink-950 text-white ring-ink-950" : "bg-surface ring-ink-200")}
-            >
-              <I className={cn("mx-auto size-4", pinned === t ? "text-sun-400" : c)} />
-              <span className={cn("mt-1 block text-[0.65rem]", pinned === t ? "text-ink-300" : "text-ink-500")}>{l}</span>
-              <span className="num block text-xs font-semibold">{v}</span>
-            </button>
-          ))}
-        </div>
-        <div className="mt-2 min-h-[5.5rem] rounded-xl bg-ink-50 p-3 text-xs ring-1 ring-ink-100" aria-live="polite">
-          {info && pinned ? (
-            <InfoBody info={info} />
-          ) : (
-            <p className="text-ink-500">Ketuk komponen di atas — atau langsung pada ilustrasi — untuk melihat penjelasan singkatnya.</p>
-          )}
-        </div>
       </div>
       <p className="sr-only" aria-live="polite">
         Cuaca simulasi: {CUACA[sim.cuaca].label}.

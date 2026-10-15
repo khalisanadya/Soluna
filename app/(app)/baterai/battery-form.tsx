@@ -181,7 +181,7 @@ export function BatteryForm({
         <div className="flex flex-col gap-3 border-t border-ink-100 bg-canvas/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-xs text-ink-500">
             <span className="text-flame-500">*</span> Semua kolom wajib diisi.{" "}
-            {ubah ? "Perubahan langsung terlihat oleh pengelola desa." : "Setelah disimpan, baterai berstatus Belum dinilai sampai dinilai pengelola desa."}
+            {ubah ? "Perubahan langsung tersinkron ke data yang dibaca pengelola desa." : "Setelah disimpan, lakukan assessment pemasok untuk menerbitkan SoH, grade, sisa umur, dan paspor baterai."}
           </p>
           <div className="flex shrink-0 gap-2">
             <button type="button" onClick={() => leave(cancelHref)} className={buttonClass("ghost", "md")}>

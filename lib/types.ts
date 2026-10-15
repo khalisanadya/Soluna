@@ -13,14 +13,15 @@ export type HasilPenilaian = {
     bawah: number;
     tengah: number;
     atas: number;
-    ketidakpastian: number;
-    laju_per_tahun: number;
-    sumber_laju: "teramati" | "bawaan";
-    faktor_stres: string[];
+    satuan: "siklus";
   };
+  /** Tidak ada pada hasil assessment lama sebelum model mengembalikan siklus. */
+  sisa_umur_siklus?: { bawah: number; tengah: number; atas: number };
+  model: { versi: string; dilatih_pada: string; dataset: string };
+  peringatan_model: string[];
   keyakinan: number;
   kelengkapan_data: number;
-  penggantian: { tengah: string; paling_cepat: string; paling_lambat: string; segera: boolean };
+  penggantian: { tengah: string | null; paling_cepat: string | null; paling_lambat: string | null; segera: boolean };
   jalur_daur_ulang: boolean;
   nilai_bawaan: string[];
   langkah: Langkah[];
@@ -69,6 +70,7 @@ export type HasilRencana = {
     sistem_per_rumah: Rentang;
     diesel_per_rumah: Rentang;
     iuran_perawatan_per_rumah_bulan: Rentang;
+    titik_impas_tahun: { rendah: number | null; tinggi: number | null };
     periode_hari: number;
   };
   nilai_bawaan: string[];

@@ -75,3 +75,10 @@ export function rentangUmur(bawah: number, atas: number): string {
   if (Math.round(atas * 12) < 12 && bawah >= 1 / 12) return `${Math.round(bawah * 12)}–${Math.round(atas * 12)} bulan`;
   return `${a} – ${b}`;
 }
+
+export function rentangSiklus(bawah: number | null | undefined, atas: number | null | undefined): string {
+  if (bawah === null || bawah === undefined || atas === null || atas === undefined) return "—";
+  const a = Math.round(bawah);
+  const b = Math.round(atas);
+  return a === b ? `± ${num(a, 0)} siklus` : `${num(a, 0)}–${num(b, 0)} siklus`;
+}

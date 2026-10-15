@@ -4,7 +4,7 @@ import { CalendarClock, ClipboardCheck, CloudRain, PlugZap, SunMedium } from "lu
 import { Badge, Card, EmptyState, PageHeader, buttonClass } from "@/components/ui";
 import { Paginasi, bacaHalaman } from "@/components/paginasi";
 import { requireAdmin } from "@/lib/auth";
-import { days, num, rentangUmur, tanggal } from "@/lib/format";
+import { days, num, rentangSiklus, tanggal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { HasilKetahanan, HasilKompatibilitas, HasilRencana } from "@/lib/types";
 
@@ -52,7 +52,7 @@ export default async function RiwayatPage({ searchParams }: PageProps<"/riwayat"
       jenis: "Penilaian",
       waktu: p.createdAt,
       judul: `${p.baterai.kode} → grade ${p.grade}`,
-      detail: `SoH ${num(p.soh)}% · sisa umur ${rentangUmur(p.sisaUmurBawah, p.sisaUmurAtas)} · keyakinan ${num(p.keyakinan, 0)}%`,
+      detail: `SoH ${num(p.soh)}% · sisa umur ${rentangSiklus(p.sisaUmurSiklusBawah, p.sisaUmurSiklusAtas)} · keyakinan ${num(p.keyakinan, 0)}%`,
       href: `/penilaian/${p.id}`,
       versi: `v${p.versiKonfigurasi}`,
       icon: ClipboardCheck,

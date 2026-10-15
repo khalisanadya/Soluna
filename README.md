@@ -26,6 +26,7 @@ DATABASE_URL="postgresql://postgres:<sandi>@localhost:5432/soluna?schema=public"
 SESSION_SECRET="<string acak panjang>"
 ENGINE_URL="http://127.0.0.1:8000"
 # opsional: ADMIN_INVITE_CODE (wajibkan kode saat daftar admin), SOLUNA_LLM_ENDPOINT (model bahasa penjelasan)
+# model baterai terlatih (wajib untuk penilaian): NEXT_PUBLIC_API_URL, BATTERY_API_KEY
 
 npm run db:migrate          # buat tabel
 npm run engine              # terminal 1: mesin hitung FastAPI di :8000
@@ -61,6 +62,7 @@ Menjalankan test case proposal (bagian 6.1, toleransi ±5%): kebutuhan malam ≈
 ## Catatan batasan
 
 - Rentang sisa umur memakai **model empiris sementara** (`sisa-umur-empiris-0.1`), bukan model ML terlatih. Pelatihan model berada di luar lingkup; antarmukanya dapat diganti model hasil pelatihan.
-- Model bahasa fine-tune belum terpasang; penjelasan memakai template. Pasang `SOLUNA_LLM_ENDPOINT` (POST `{prompt}` → `{text}`) untuk memakai model; teksnya tetap melewati cek angka.
+- Penilaian baterai memakai model terlatih pada `NEXT_PUBLIC_API_URL` (POST `/assess`, header `x-api-key` dari `BATTERY_API_KEY`). Bila layanan model tidak tersedia, penilaian gagal secara eksplisit; SOLUNA tidak memakai prediksi umur pengganti.
+- Model bahasa hanya merangkai penjelasan bila `SOLUNA_LLM_ENDPOINT` dipasang (POST `{prompt}` → `{text}`); teksnya tetap melewati cek angka.
 - Semua angka contoh, harga, dan data seed adalah **ilustrasi** dan perlu dikalibrasi dengan data desa sebenarnya.
 - Hasil bersifat indikatif dan tidak menggantikan pemeriksaan teknis, sertifikasi, atau jaminan keselamatan.
