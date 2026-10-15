@@ -40,11 +40,12 @@ function safeNext(value: FormDataEntryValue | null): string {
 
 export async function logout() {
   await deleteSession();
-  redirect("/masuk");
+  // Setelah keluar (admin maupun pemasok), kembali ke halaman awal SOLUNA.
+  redirect("/");
 }
 
 export async function register(_prev: FormState, fd: FormData): Promise<FormState> {
-  const peran = fd.get("peran") === "ADMIN" ? "ADMIN" : "PEMASOK";
+  // Pendaftaran mandiri hanya untuk pemasok. Akun pengelola sistem desa (ADMIN) tidak dapat dibuat dari sini.
   const values = formValues(fd);
 
   // Kata sandi tidak melalui pick() agar tidak di-trim atau diubah (mis. "12,5" → "12.5").
@@ -54,8 +55,7 @@ export async function register(_prev: FormState, fd: FormData): Promise<FormStat
   if (fd.get("password") !== fd.get("konfirmasi")) errors.konfirmasi = ["Konfirmasi kata sandi tidak sama."];
 
   let profil: z.infer<typeof profilPemasokSchema> | null = null;
-  let namaAdmin = "";
-  if (peran === "PEMASOK") {
+  {
     const parsed = profilPemasokSchema.safeParse({
       ...pick(fd, [
         "namaPenanggungJawab",
@@ -74,15 +74,9 @@ export async function register(_prev: FormState, fd: FormData): Promise<FormStat
     });
     if (!parsed.success) Object.assign(errors, z.flattenError(parsed.error).fieldErrors);
     else profil = parsed.data;
-  } else {
-    namaAdmin = String(fd.get("nama") ?? "").trim();
-    if (!namaAdmin) errors.nama = ["Nama wajib diisi."];
-    // Bila ADMIN_INVITE_CODE diatur, pendaftaran admin memerlukan kode undangan.
-    const kode = process.env.ADMIN_INVITE_CODE;
-    if (kode && fd.get("kodeAdmin") !== kode) errors.kodeAdmin = ["Kode undangan pengelola tidak valid."];
   }
 
-  if (Object.keys(errors).length || !akun.success) {
+  if (Object.keys(errors).length || !akun.success || !profil) {
     return { errors, values, message: "Periksa kembali isian yang ditandai." };
   }
 
@@ -110,9 +104,9 @@ export async function register(_prev: FormState, fd: FormData): Promise<FormStat
         username,
         email,
         passwordHash,
-        peran,
-        nama: profil ? profil.namaPenanggungJawab : namaAdmin,
-        ...(profil ? { pemasok: { create: profil } } : {}),
+        peran: "PEMASOK",
+        nama: profil.namaPenanggungJawab,
+        pemasok: { create: profil },
       },
     });
   } catch (err) {

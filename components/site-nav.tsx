@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Menu, X } from "lucide-react";
+import { LogIn, Menu, X } from "lucide-react";
 import { cn } from "@/lib/format";
 import { ButtonLink, Logo } from "./ui";
 
@@ -42,8 +42,12 @@ export function SiteNav() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 transition-[background-color,box-shadow,backdrop-filter] duration-300",
-        scrolled || open ? "bg-canvas/85 shadow-[0_1px_0_rgb(28_27_25/0.08)] backdrop-blur-md" : "bg-transparent",
+        "sticky top-0 z-50 border-b transition-[background-color,border-color,box-shadow,backdrop-filter] duration-300",
+        open
+          ? "border-ink-200/50 bg-canvas/95 backdrop-blur-xl"
+          : scrolled
+            ? "border-ink-200/50 bg-surface/55 shadow-[0_8px_24px_-20px_rgb(28_27_25/0.25)] backdrop-blur-xl backdrop-saturate-150"
+            : "border-transparent bg-transparent",
       )}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:h-[4.5rem]">
@@ -60,8 +64,8 @@ export function SiteNav() {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
-          <ButtonLink href="/masuk" variant="ghost" size="sm">
-            Masuk
+          <ButtonLink href="/masuk" variant="secondary" size="sm" className="shadow-soft hover:ring-ink-300">
+            <LogIn className="size-4" /> Masuk
           </ButtonLink>
           <ButtonLink href="/daftar" variant="dark" size="sm">
             Daftar

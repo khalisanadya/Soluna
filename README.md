@@ -25,7 +25,7 @@ engine/.venv/Scripts/python -m pip install -r engine/requirements.txt   # macOS/
 DATABASE_URL="postgresql://postgres:<sandi>@localhost:5432/soluna?schema=public"
 SESSION_SECRET="<string acak panjang>"
 ENGINE_URL="http://127.0.0.1:8000"
-# opsional: ADMIN_INVITE_CODE (wajibkan kode saat daftar admin), SOLUNA_LLM_ENDPOINT (model bahasa penjelasan)
+# opsional: SOLUNA_LLM_ENDPOINT (model bahasa penjelasan)
 # model baterai terlatih (wajib untuk penilaian): NEXT_PUBLIC_API_URL, BATTERY_API_KEY
 
 npm run db:migrate          # buat tabel
@@ -35,7 +35,7 @@ npm run dev                 # terminal 2: aplikasi web di :3000
 # atau keduanya sekaligus: npm run dev:all
 ```
 
-Akun demo (ilustrasi): `admin` / `soluna123` (admin), `armada` / `soluna123` (pemasok).
+Akun demo (ilustrasi): `admin` / `soluna123` (admin), `armada` / `soluna123` (pemasok). Halaman Daftar hanya membuat akun pemasok; akun admin dibuat lewat seed/basis data.
 
 ## Uji penerimaan
 

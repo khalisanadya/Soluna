@@ -8,7 +8,7 @@ import { buttonClass } from "./ui";
 
 /**
  * Konfirmasi setiap kali pengguna keluar dari formulir yang belum disimpan.
- * - Tombol Batal (`leave(href)`), klik tautan internal (menu, logo), dan tombol Back peramban:
+ * - Tombol Batal (`leave(href)`, atau `leave(fn)` untuk menutup formulir tanpa pindah halaman), klik tautan internal (menu, logo), dan tombol Back peramban:
  *   dialog konfirmasi SOLUNA.
  * - Menutup atau memuat ulang tab: peringatan bawaan peramban, hanya bila sudah ada isian
  *   (peramban tidak mengizinkan dialog kustom di sini).
@@ -17,7 +17,7 @@ import { buttonClass } from "./ui";
 export function useUnsavedGuard(dirty: boolean) {
   const router = useRouter();
   const ref = useRef<HTMLDialogElement>(null);
-  const [tujuan, setTujuan] = useState<{ href: string } | { back: true } | null>(null);
+  const [tujuan, setTujuan] = useState<{ href: string } | { back: true } | { aksi: () => void } | null>(null);
   const aktif = useRef(true);
   const dirtyRef = useRef(dirty);
   useEffect(() => {
@@ -71,8 +71,8 @@ export function useUnsavedGuard(dirty: boolean) {
     };
   }, []);
 
-  const leave = useCallback((href: string) => {
-    setTujuan({ href });
+  const leave = useCallback((target: string | (() => void)) => {
+    setTujuan(typeof target === "string" ? { href: target } : { aksi: target });
     ref.current?.showModal();
   }, []);
 
@@ -81,7 +81,8 @@ export function useUnsavedGuard(dirty: boolean) {
     ref.current?.close();
     if (!tujuan) return;
     // Back: lewati entri penjaga dan halaman formulir sekaligus.
-    if ("back" in tujuan) history.go(-2);
+    if ("aksi" in tujuan) tujuan.aksi();
+    else if ("back" in tujuan) history.go(-2);
     else router.push(tujuan.href);
   };
 

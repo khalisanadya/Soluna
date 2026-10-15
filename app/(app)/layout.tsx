@@ -35,11 +35,12 @@ async function StatusPills() {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh">
+    <div className="group/app min-h-dvh">
       <Suspense fallback={<NavSkeleton />}>
         <NavLoader />
       </Suspense>
-      <div className="md:pl-20 lg:pl-64 print:!pl-0">
+      {/* Bilah atas pemasok (data-topnav) menggantikan sidebar, jadi jarak kiri dihapus. */}
+      <div className="md:pl-20 lg:pl-64 group-has-[[data-topnav]]/app:md:!pl-0 print:!pl-0">
         <div className="mx-auto w-full max-w-[1320px] px-4 pt-4 pb-28 sm:px-6 md:pb-12 lg:px-10 lg:pt-6">
           <div className="mb-2 flex h-8 items-center justify-end print:hidden">
             <Suspense fallback={null}>

@@ -29,6 +29,8 @@ export async function updateProfil(_prev: FormState, fd: FormData): Promise<Form
     return { values: formValues(fd), errors: z.flattenError(parsed.error).fieldErrors, message: "Periksa kembali isian yang ditandai." };
   }
   const d = parsed.data;
+  // Provinsi tanpa kabupaten/kota dan tanpa alamat: lokasi penyimpanan dianggap tidak diisi.
+  const adaPenyimpanan = Boolean(d.alamatPenyimpanan || d.kotaPenyimpanan);
   await prisma.pemasok.update({
     where: { id: user.pemasokId },
     data: {
@@ -36,8 +38,8 @@ export async function updateProfil(_prev: FormState, fd: FormData): Promise<Form
       deskripsi: d.deskripsi ?? null,
       jenisBaterai: d.jenisBaterai ?? null,
       alamatPenyimpanan: d.alamatPenyimpanan ?? null,
-      kotaPenyimpanan: d.kotaPenyimpanan ?? null,
-      provinsiPenyimpanan: d.provinsiPenyimpanan ?? null,
+      kotaPenyimpanan: adaPenyimpanan ? (d.kotaPenyimpanan ?? null) : null,
+      provinsiPenyimpanan: adaPenyimpanan ? (d.provinsiPenyimpanan ?? null) : null,
       user: { update: { nama: d.namaPenanggungJawab } },
     },
   });

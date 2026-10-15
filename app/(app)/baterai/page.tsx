@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import type { Prisma } from "@prisma/client";
-import { BatteryCharging, ChevronRight, Plus } from "lucide-react";
-import { Badge, ButtonLink, Card, EmptyState, GradeBadge, PageHeader, SohBadge } from "@/components/ui";
+import { BatteryCharging, ChevronRight, ClipboardCheck, Plus } from "lucide-react";
+import { Badge, ButtonLink, Card, EmptyState, GradeBadge, PageHeader, SohBadge, gradeTone } from "@/components/ui";
 import { Paginasi, bacaHalaman } from "@/components/paginasi";
 import { requireUser } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
 import { bateraiScope } from "@/lib/data";
-import { num } from "@/lib/format";
+import { cn, num } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { JENIS_KIMIA } from "@/lib/wilayah";
 import { FilterForm } from "./filter-form";
@@ -75,9 +75,14 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
         title={isAdmin ? "Daftar baterai" : "Baterai saya"}
         description={isAdmin ? "Semua baterai bekas yang ditawarkan pemasok. Pilih baterai untuk dinilai." : "Baterai yang Anda daftarkan beserta status penilaiannya."}
         actions={
-          <ButtonLink href="/baterai/baru">
-            <Plus className="size-4" /> Tambah baterai
-          </ButtonLink>
+          <>
+            <ButtonLink href="/penilaian/baru" variant="secondary">
+              <ClipboardCheck className="size-4" /> Penilaian baterai
+            </ButtonLink>
+            <ButtonLink href="/baterai/baru">
+              <Plus className="size-4" /> Tambah baterai
+            </ButtonLink>
+          </>
         }
       />
 
@@ -96,31 +101,31 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
         <>
           {/* Desktop: tabel */}
           <Card className="hidden overflow-hidden !p-0 md:block">
-            <table className="w-full text-left text-sm">
+            <table className="w-full table-fixed text-left text-sm">
               <thead className="bg-ink-50 text-xs text-ink-500">
                 <tr>
-                  <th className="px-5 py-3 font-medium">Kode</th>
+                  <th className="w-32 px-5 py-3 font-medium">Kode</th>
                   <th className="px-3 py-3 font-medium">Baterai</th>
                   {isAdmin && <th className="px-3 py-3 font-medium">Pemasok</th>}
-                  <th className="px-3 py-3 text-center font-medium">Kapasitas</th>
-                  <th className="w-24 px-2 py-3 text-center font-medium">Status</th>
-                  <th className="w-24 px-2 py-3 text-center font-medium">SoH</th>
-                  <th className="px-5 py-3 text-center font-medium">Aksi</th>
+                  <th className="w-28 px-3 py-3 text-center font-medium">Kapasitas</th>
+                  <th className="w-32 px-3 py-3 text-center font-medium">Grade</th>
+                  <th className="w-28 px-3 py-3 text-center font-medium">SoH</th>
+                  <th className="w-56 px-5 py-3 text-center font-medium">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100">
                 {rows.map((b) => (
                   <tr key={b.id} className="group hover:bg-ink-50/70">
-                    <td className="px-5 py-3">
+                    <td className="px-5 py-3 align-middle">
                       <Link href={`/baterai/${b.id}`} className="num font-semibold hover:underline">
                         {b.kode}
                       </Link>
                     </td>
-                    <td className="px-3 py-3">
-                      <span className="block font-medium">
+                    <td className="px-3 py-3 align-middle">
+                      <span className="block truncate font-medium">
                         {b.merek} {b.model}
                       </span>
-                      <span className="text-xs text-ink-500">
+                      <span className="block truncate text-xs text-ink-500">
                         {b.jenisKimia} · {b.usiaTahun !== null ? `${num(b.usiaTahun)} tahun` : "usia tidak diketahui"}
                       </span>
                     </td>
@@ -131,29 +136,38 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                         </Link>
                       </td>
                     )}
-                    <td className="num px-3 py-3 text-center whitespace-nowrap">{num(b.kapasitasAwalKwh)} kWh</td>
-                    <td className="px-2 py-3">
+                    <td className="num px-3 py-3 text-center align-middle whitespace-nowrap">{num(b.kapasitasAwalKwh)} kWh</td>
+                    <td className="px-3 py-3 align-middle">
                       <div className="flex justify-center">
                         <GradeBadge grade={b.gradeTerakhir} size="sm" />
                       </div>
                     </td>
-                    <td className="px-2 py-3 text-center">
+                    <td className="px-3 py-3 text-center align-middle">
                       <SohBadge soh={b.sohTerakhir} tinggi={cfg.grade.A} rendah={cfg.grade.C} />
                     </td>
-                    <td className="px-5 py-3 text-center">
+                    <td className="px-5 py-3 text-center align-middle">
                       {isAdmin ? (
                         <ButtonLink href={`/baterai/${b.id}`} size="sm" variant="secondary">
                           {b.status === "DINILAI" ? "Lihat assessment" : "Menunggu pemasok"}
                         </ButtonLink>
                       ) : (
-                        <div className="flex items-center justify-end gap-2">
-                          {b.penilaian[0] && (
-                            <ButtonLink href={`/penilaian/${b.penilaian[0].id}`} size="sm" variant="secondary">
+                        <div className="flex items-center justify-center gap-3">
+                          {b.penilaian[0] ? (
+                            <ButtonLink href={`/penilaian/${b.penilaian[0].id}`} size="sm" variant="secondary" className="w-32 justify-center">
                               Paspor
                             </ButtonLink>
+                          ) : (
+                            <ButtonLink href={`/penilaian/baru?baterai=${b.id}`} size="sm" className="w-32 justify-center">
+                              <ClipboardCheck className="size-4" /> Nilai baterai
+                            </ButtonLink>
                           )}
-                          <Link href={`/baterai/${b.id}`} className="text-ink-400 group-hover:text-ink-900">
-                            <ChevronRight className="ml-auto size-4" />
+                          <Link
+                            href={`/baterai/${b.id}`}
+                            aria-label={`Detail baterai ${b.kode}`}
+                            title="Lihat detail"
+                            className="grid size-8 place-items-center rounded-full text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-900 group-hover:text-ink-700"
+                          >
+                            <ChevronRight className="size-4" />
                           </Link>
                         </div>
                       )}
@@ -178,6 +192,14 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                   </span>
                   {b.status === "DINILAI" ? <SohBadge soh={b.sohTerakhir} tinggi={cfg.grade.A} rendah={cfg.grade.C} /> : <Badge tone="sun">Menunggu</Badge>}
                 </Link>
+              </li>
+            ))}
+          </ul>
+          <ul className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-600" aria-label="Arti warna grade">
+            {(["A", "B", "C", "D"] as const).map((g) => (
+              <li key={g} className="flex items-center gap-2">
+                <span className={cn("size-2.5 rounded-full", gradeTone[g].bg)} aria-hidden="true" />
+                {gradeTone[g].label}
               </li>
             ))}
           </ul>

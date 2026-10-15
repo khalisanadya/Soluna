@@ -22,6 +22,9 @@ export function Donut({
   const total = segments.reduce((s, x) => s + x.value, 0);
   const r = (size - thickness) / 2;
   const c = 2 * Math.PI * r;
+  const terisi = segments.filter((x) => x.value > 0).length;
+  // Ujung membulat menjorok thickness/2 di kedua sisi: kurangi panjang garis agar jarak antarsegmen tetap terlihat.
+  const jarak = terisi > 1 ? thickness + 4 : 0;
   let offset = 0;
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -30,7 +33,7 @@ export function Donut({
         {total > 0 &&
           segments.map((s) => {
             const len = (s.value / total) * c;
-            const gap = segments.filter((x) => x.value > 0).length > 1 ? 3 : 0;
+            if (s.value <= 0) return null;
             const el = (
               <circle
                 key={s.label}
@@ -40,9 +43,10 @@ export function Donut({
                 fill="none"
                 stroke={s.color}
                 strokeWidth={thickness}
-                strokeDasharray={`${Math.max(0, len - gap)} ${c}`}
-                strokeDashoffset={-offset}
-                strokeLinecap="butt"
+                strokeDasharray={terisi > 1 ? `${Math.max(0.01, len - jarak)} ${c}` : `${c} ${c}`}
+                strokeDashoffset={terisi > 1 ? -(offset + jarak / 2) : 0}
+                strokeLinecap={terisi > 1 ? "round" : "butt"}
+                className="transition-opacity hover:opacity-80"
               >
                 <title>{`${s.label}: ${s.value}`}</title>
               </circle>

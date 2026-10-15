@@ -72,8 +72,14 @@ export const profilPemasokSchema = z
     if (d.kota && !isKabupatenKotaDi(d.provinsi, d.kota)) {
       ctx.addIssue({ code: "custom", path: ["kota"], message: "Pilih kabupaten/kota dari daftar provinsi yang dipilih." });
     }
-    if (d.provinsiPenyimpanan && !d.kotaPenyimpanan) {
-      ctx.addIssue({ code: "custom", path: ["kotaPenyimpanan"], message: "Pilih kabupaten/kota lokasi penyimpanan." });
+    // Lokasi penyimpanan opsional: provinsi saja tanpa alamat dianggap kosong (lihat updateProfil).
+    // Kabupaten/kota baru diwajibkan bila alamat penyimpanan diisi.
+    if (d.alamatPenyimpanan && !d.kotaPenyimpanan) {
+      ctx.addIssue({
+        code: "custom",
+        path: [d.provinsiPenyimpanan ? "kotaPenyimpanan" : "provinsiPenyimpanan"],
+        message: d.provinsiPenyimpanan ? "Pilih kabupaten/kota lokasi penyimpanan." : "Pilih provinsi lokasi penyimpanan.",
+      });
     } else if (d.kotaPenyimpanan && !isKabupatenKotaDi(d.provinsiPenyimpanan, d.kotaPenyimpanan)) {
       ctx.addIssue({
         code: "custom",
