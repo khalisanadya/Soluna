@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SunMedium } from "lucide-react";
 import { Card, EmptyState, IlustrasiTag, PageHeader, SectionTitle } from "@/components/ui";
+import { Paginasi, bacaHalaman } from "@/components/paginasi";
 import { requireAdmin } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
 import { num, tanggal } from "@/lib/format";
@@ -11,45 +12,48 @@ import { PlanForm } from "./plan-form";
 
 export const metadata: Metadata = { title: "Perencana Desa" };
 
-export default async function PerencanaPage() {
+export default async function PerencanaPage({ searchParams }: PageProps<"/perencana">) {
   await requireAdmin();
+  const sp = await searchParams;
+  const totalRencana = await prisma.rencanaDesa.count();
+  const hal = bacaHalaman(sp, totalRencana);
   const [{ data: cfg }, rencana, baterai] = await Promise.all([
     getActiveConfig(),
-    prisma.rencanaDesa.findMany({ orderBy: { createdAt: "desc" }, take: 30 }),
+    prisma.rencanaDesa.findMany({ orderBy: { createdAt: "desc" }, skip: hal.skip, take: hal.take }),
     prisma.baterai.findMany({
       where: { status: "DINILAI", gradeTerakhir: { in: ["A", "B", "C"] } },
       orderBy: { sohTerakhir: "desc" },
       select: { id: true, kode: true, merek: true, model: true, kapasitasAwalKwh: true, sohTerakhir: true, gradeTerakhir: true },
     }),
   ]);
-  const perangkat = Object.values(cfg.tingkat_beban).flatMap((t) => t.perangkat.map((p) => ({ nama: p, tingkat: t.label })));
 
   return (
     <>
       <PageHeader
-        eyebrow="Modul B · Perencana desa"
+        eyebrow="Perencanaan"
         title="Rancang sistem energi desa"
-        description="Masukkan profil kebutuhan desa. SOLUNA menghitung paket baterai, panel surya, inverter, penghematan diesel, dan biaya per rumah."
+        description="Masukkan profil kebutuhan desa untuk menghitung paket baterai, panel surya, inverter, dan perbandingan biaya dengan genset diesel."
       />
       <div className="grid gap-4 xl:grid-cols-[1fr_22rem]">
         <PlanForm
           lokasi={Object.entries(cfg.lokasi_psh).map(([k, v]) => ({ nama: k, psh: v }))}
-          perangkat={perangkat}
-          baterai={baterai.map((b) => ({ id: b.id, label: `${b.kode} · ${b.merek} ${b.model} — ${num(b.kapasitasAwalKwh)} kWh, SoH ${num(b.sohTerakhir)}% (grade ${b.gradeTerakhir})` }))}
+          baterai={baterai.map((b) => ({ id: b.id, label: `${b.kode} · ${b.merek} ${b.model} — ${num(b.kapasitasAwalKwh)} kWh, SoH ${num(b.sohTerakhir)}%, grade ${b.gradeTerakhir}` }))}
           defaults={{
             psh: cfg.surya.psh_jam,
-            pr: cfg.surya.pr * 100,
-            efisiensi: cfg.efisiensi * 100,
-            dod: cfg.dod * 100,
+            pr: Math.round(cfg.surya.pr * 100),
+            efisiensi: Math.round(cfg.efisiensi * 100),
+            dod: Math.round(cfg.dod * 100),
             hariCadangan: cfg.hari_cadangan,
             wpPanel: cfg.surya.kapasitas_per_panel_wp,
             kapasitasPaket: cfg.profil_paket.kapasitas_kwh,
-            sohPaket: cfg.profil_paket.soh * 100,
+            sohPaket: Math.round(cfg.profil_paket.soh * 100),
+            hargaSolarMin: cfg.diesel.harga_per_liter_rendah,
+            hargaSolarMaks: cfg.diesel.harga_per_liter_tinggi,
           }}
         />
         <aside>
           <Card className="xl:sticky xl:top-6">
-            <SectionTitle title="Rencana tersimpan" hint={`${rencana.length} rencana`} />
+            <SectionTitle title="Rencana tersimpan" />
             {rencana.length ? (
               <ul className="-mx-2 space-y-1">
                 {rencana.map((r) => {
@@ -73,6 +77,9 @@ export default async function PerencanaPage() {
               </ul>
             ) : (
               <EmptyState icon={<SunMedium className="size-5" />} title="Belum ada rencana" className="py-8" />
+            )}
+            {rencana.length > 0 && (
+              <Paginasi basePath="/perencana" sp={sp} halaman={hal.halaman} total={totalRencana} tampil={rencana.length} satuan="rencana" ringkas className="border-t border-ink-100 pt-3" />
             )}
           </Card>
         </aside>

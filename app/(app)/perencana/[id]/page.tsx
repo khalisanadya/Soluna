@@ -1,16 +1,14 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BatteryCharging, CheckCircle2, CircleX, CloudRain, Cpu, Fuel, Leaf, PanelsTopLeft, PlugZap, Trash2, Zap } from "lucide-react";
+import { ArrowLeftRight, BatteryCharging, CheckCircle2, ChevronRight, CircleX, CloudRain, Cpu, Fuel, Leaf, PanelsTopLeft, PlugZap, Trash2, Zap } from "lucide-react";
 import { deletePlan } from "@/app/actions/perencana";
-import { CalcDetail, DefaultsUsed, ExplanationCard } from "@/components/calc";
-import { EnergyFlow } from "@/components/energy-flow";
 import { PrintButton } from "@/components/print-button";
-import { Badge, ButtonLink, Card, Disclaimer, IlustrasiTag, KeyValue, Notice, PageHeader, SectionTitle, Stat, buttonClass } from "@/components/ui";
+import { Badge, ButtonLink, Card, IlustrasiTag, KeyValue, Notice, PageHeader, SectionTitle, Stat, buttonClass } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
-import type { Penjelasan } from "@/lib/engine";
-import { num, rupiah, rupiahShort, tanggal } from "@/lib/format";
+import { cn, num, rupiah, rupiahShort, tanggal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import type { HasilKompatibilitas, HasilRencana } from "@/lib/types";
+import type { HasilKetahanan, HasilKompatibilitas, HasilRencana } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Hasil Perencanaan" };
 
@@ -20,73 +18,90 @@ export default async function HasilRencanaPage({ params, searchParams }: PagePro
   const sp = await searchParams;
   const r = await prisma.rencanaDesa.findUnique({
     where: { id },
-    include: { dibuatOleh: { select: { nama: true } }, cekKompat: { orderBy: { createdAt: "desc" }, take: 1 } },
+    include: {
+      dibuatOleh: { select: { nama: true } },
+      cekKompat: { orderBy: { createdAt: "desc" }, take: 1 },
+      simulasi: { orderBy: { createdAt: "desc" }, take: 1 },
+    },
   });
   if (!r) notFound();
   const h = r.hasil as unknown as HasilRencana;
-  const m = r.masukan as { jumlah_rumah: number; konsumsi_per_rumah_kwh: number; porsi_malam: number; jenis_beban: string[]; lokasi?: string };
+  const m = r.masukan as { jumlah_rumah: number; konsumsi_per_rumah_kwh: number; porsi_malam: number; lokasi?: string };
   const s = h.ringkasan;
+  const p = h.parameter;
   const b = h.biaya;
-  const per = b.periode_hari === 30 ? "bulan" : `${b.periode_hari} hari`;
+  const per = b.periode_hari === 30 ? "bulan" : b.periode_hari === 365 ? "tahun" : `${b.periode_hari} hari`;
   const maxBiaya = Math.max(b.diesel_per_rumah.tinggi, b.sistem_per_rumah.tinggi);
   const kompat = r.cekKompat[0]?.hasil as HasilKompatibilitas | undefined;
+  const sim = r.simulasi[0]?.hasil as HasilKetahanan | undefined;
+  const hujan = sim?.skenario.find((x) => x.kunci === "hujan_beberapa_hari") ?? sim?.skenario.at(-1);
   const hemat = { rendah: b.diesel_per_rumah.rendah - b.sistem_per_rumah.tinggi, tinggi: b.diesel_per_rumah.tinggi - b.sistem_per_rumah.rendah };
+  const gagal = h.pemeriksaan.filter((c) => !c.lulus);
 
   return (
     <>
       <PageHeader
-        eyebrow={<>Modul B · Hasil perencanaan {r.ilustrasi && <IlustrasiTag />}</>}
+        eyebrow={<>Perencanaan {r.ilustrasi && <IlustrasiTag />}</>}
         title={r.namaDesa}
-        description={`${r.nama} · ${m.jumlah_rumah} rumah × ${num(m.konsumsi_per_rumah_kwh)} kWh/hari · ${num(m.porsi_malam * 100, 0)}% malam${m.lokasi ? ` · ${m.lokasi}` : ""}`}
+        description={`${r.nama} · ${num(m.jumlah_rumah, 0)} rumah · ${num(m.konsumsi_per_rumah_kwh)} kWh/rumah/hari${m.lokasi ? ` · ${m.lokasi}` : ""}`}
         actions={
           <>
-            <PrintButton label="Laporan ringkas" />
-            <ButtonLink href={`/kompatibilitas?rencana=${r.id}`} variant="secondary" className="print:hidden">
-              <PlugZap className="size-4" /> Kompatibilitas
-            </ButtonLink>
+            <PrintButton label="Cetak" />
             <ButtonLink href={`/ketahanan?rencana=${r.id}`} className="print:hidden">
               <CloudRain className="size-4" /> Simulasi ketahanan
             </ButtonLink>
           </>
         }
       />
-      {sp.baru && <Notice tone="success" className="mb-4 print:hidden">Rencana tersimpan. Lanjutkan ke simulasi ketahanan untuk menguji cuaca buruk.</Notice>}
+      {sp.baru && (
+        <Notice tone="success" className="mb-4 print:hidden" title="Rencana tersimpan">
+          Lanjutkan dengan mencocokkan baterai, memeriksa kompatibilitas, dan menguji ketahanan saat cuaca buruk.
+        </Notice>
+      )}
 
-      {/* P-7 ringkasan */}
+      {/* Rancangan sistem */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Stat label="Kebutuhan harian" value={num(s.kebutuhan_harian_kwh)} unit="kWh" icon={<Zap className="size-4" />} accent="ink" hint={`Malam ${num(s.kebutuhan_malam_kwh)} kWh (termasuk rugi konversi)`} />
+        <Stat label="Kebutuhan listrik" value={num(s.kebutuhan_harian_kwh)} unit="kWh/hari" icon={<Zap className="size-4" />} accent="ink" hint={`${num(s.kebutuhan_malam_kwh)} kWh dipakai malam hari`} />
         <Stat
-          label="Paket baterai"
+          label="Baterai"
           value={s.jumlah_paket}
           unit="paket"
           icon={<BatteryCharging className="size-4" />}
           accent="leaf"
-          hint={`${s.paket_siklus_harian} siklus harian + cadangan ${h.parameter.hari_cadangan} hari · ${num(s.kapasitas_terpakai_per_paket_kwh)} kWh terpakai/paket`}
+          hint={`${num(s.energi_tersedia_kwh)} kWh dapat dipakai`}
         />
-        <Stat label="Panel surya" value={num(s.kapasitas_panel_kwp)} unit="kWp" icon={<PanelsTopLeft className="size-4" />} accent="sun" hint={`${s.jumlah_panel} panel × ${h.parameter.kapasitas_per_panel_wp} Wp (${num(s.kapasitas_panel_terpasang_kwp)} kWp terpasang)`} />
-        <Stat label="Inverter" value={s.inverter_kw} unit="kW" icon={<Cpu className="size-4" />} accent="sky" hint={`Daya puncak ${num(s.daya_puncak_kw)} kW`} />
+        <Stat
+          label="Panel surya"
+          value={s.jumlah_panel}
+          unit="panel"
+          icon={<PanelsTopLeft className="size-4" />}
+          accent="sun"
+          hint={s.produksi_surya_harian_kwh !== undefined ? `${num(s.kapasitas_panel_terpasang_kwp)} kWp · ±${num(s.produksi_surya_harian_kwh)} kWh/hari` : `${num(s.kapasitas_panel_terpasang_kwp)} kWp terpasang`}
+        />
+        <Stat label="Inverter" value={s.inverter_kw} unit="kW" icon={<Cpu className="size-4" />} accent="sky" hint={`Beban puncak ${num(s.daya_puncak_kw)} kW`} />
       </div>
+
+      {gagal.length > 0 && (
+        <Notice tone="danger" className="mt-4" title="Rancangan belum memenuhi kebutuhan">
+          <ul className="list-disc pl-4">
+            {gagal.map((c) => (
+              <li key={c.nama}>{c.keterangan}</li>
+            ))}
+          </ul>
+        </Notice>
+      )}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <EnergyFlow
-            suryaKwh={s.kapasitas_panel_terpasang_kwp * h.parameter.psh_jam * h.parameter.pr}
-            suryaKeDesaKwh={s.kebutuhan_harian_kwh - s.kebutuhan_malam_kwh * h.parameter.efisiensi}
-            suryaKeBateraiKwh={s.kebutuhan_malam_kwh}
-            bebanKwh={s.kebutuhan_harian_kwh}
-            bateraiKwh={s.kebutuhan_malam_kwh * h.parameter.efisiensi}
-            gensetKwh={0}
-            socPersen={100}
-            rumah={m.jumlah_rumah}
-            caption="Aliran energi rata-rata pada hari cerah"
-          />
-
-          {/* P-10 biaya per rumah vs diesel */}
+          {/* Biaya per rumah vs diesel */}
           <Card>
-            <SectionTitle title="Biaya per rumah dibanding genset diesel" hint={`Per ${per}, rentang harga rendah–tinggi dari konfigurasi`} />
+            <SectionTitle
+              title="Biaya per rumah dibanding genset diesel"
+              hint={`Per ${per}${p.harga_diesel_rendah ? ` · solar ${rupiah(p.harga_diesel_rendah)}–${rupiah(p.harga_diesel_tinggi)}/liter` : ""}`}
+            />
             <div className="space-y-5">
               {[
-                { l: "Sistem SOLUNA (surya + baterai)", r: b.sistem_per_rumah, c: "bg-leaf-500", t: "bg-leaf-100" },
+                { l: "Sistem surya + baterai", r: b.sistem_per_rumah, c: "bg-leaf-500", t: "bg-leaf-100" },
                 { l: "Genset diesel", r: b.diesel_per_rumah, c: "bg-flame-500", t: "bg-flame-100" },
               ].map((x) => (
                 <div key={x.l}>
@@ -103,88 +118,66 @@ export default async function HasilRencanaPage({ params, searchParams }: PagePro
               ))}
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <div className={`rounded-2xl p-4 ${hemat.rendah >= 0 ? "bg-leaf-50" : hemat.tinggi <= 0 ? "bg-flame-50" : "bg-ink-50"}`}>
-                <p className="text-xs text-ink-500">
-                  {hemat.rendah >= 0 ? "Hemat per rumah" : hemat.tinggi <= 0 ? "Sistem lebih mahal per rumah" : "Selisih per rumah (bergantung harga)"} / {per}
-                </p>
-                <p className="num mt-1 font-semibold">
-                  {hemat.tinggi <= 0
+              <Kotak
+                label={`${hemat.rendah >= 0 ? "Hemat" : hemat.tinggi <= 0 ? "Lebih mahal" : "Selisih"} per rumah / ${per}`}
+                nilai={
+                  hemat.tinggi <= 0
                     ? `${rupiahShort(-hemat.tinggi)} – ${rupiahShort(-hemat.rendah)}`
                     : hemat.rendah >= 0
                       ? `${rupiahShort(hemat.rendah)} – ${rupiahShort(hemat.tinggi)}`
-                      : `−${rupiahShort(-hemat.rendah)} s.d. +${rupiahShort(hemat.tinggi)}`}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-ink-50 p-4">
-                <p className="text-xs text-ink-500">Investasi sistem</p>
-                <p className="num mt-1 font-semibold">
-                  {rupiahShort(b.investasi.rendah)} – {rupiahShort(b.investasi.tinggi)}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-ink-50 p-4">
-                <p className="text-xs text-ink-500">Iuran perawatan / rumah / bulan</p>
-                <p className="num mt-1 font-semibold">
-                  {rupiahShort(b.iuran_perawatan_per_rumah_bulan.rendah)} – {rupiahShort(b.iuran_perawatan_per_rumah_bulan.tinggi)}
-                </p>
-              </div>
+                      : `−${rupiahShort(-hemat.rendah)} s.d. +${rupiahShort(hemat.tinggi)}`
+                }
+                tone={hemat.rendah >= 0 ? "bg-leaf-50" : hemat.tinggi <= 0 ? "bg-flame-50" : "bg-ink-50"}
+              />
+              <Kotak label="Investasi sistem" nilai={`${rupiahShort(b.investasi.rendah)} – ${rupiahShort(b.investasi.tinggi)}`} />
+              <Kotak label="Iuran perawatan / rumah / bulan" nilai={`${rupiahShort(b.iuran_perawatan_per_rumah_bulan.rendah)} – ${rupiahShort(b.iuran_perawatan_per_rumah_bulan.tinggi)}`} />
             </div>
-            <p className="mt-3 text-xs text-ink-500">Harga baterai bekas, panel, inverter, dan diesel adalah parameter konfigurasi (ilustrasi) dan perlu disesuaikan dengan harga setempat.</p>
           </Card>
 
-          <ExplanationCard penjelasan={r.penjelasan as Penjelasan | null} />
-          <DefaultsUsed items={h.nilai_bawaan} />
-          <CalcDetail steps={h.langkah} />
+          {/* Dampak */}
+          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+            <Stat label={`Solar dihemat / ${per}`} value={num(h.lingkungan.diesel_hemat_liter, 0)} unit="liter" icon={<Fuel className="size-4" />} accent="flame" />
+            <Stat label={`CO₂ dihindari / ${per}`} value={num(h.lingkungan.co2_dihindari_kg, 0)} unit="kg" icon={<Leaf className="size-4" />} accent="leaf" />
+          </div>
         </div>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
-            <Stat label={`Diesel dihemat / ${per}`} value={num(h.lingkungan.diesel_hemat_liter, 0)} unit="liter" icon={<Fuel className="size-4" />} accent="flame" />
-            <Stat label={`CO₂ dihindari / ${per}`} value={num(h.lingkungan.co2_dihindari_kg, 0)} unit="kg" icon={<Leaf className="size-4" />} accent="leaf" />
-          </div>
-
-          {/* P-6 pemeriksaan */}
-          <Card>
-            <SectionTitle title="Pemeriksaan rancangan" hint="Energi, daya puncak, batas pengosongan" />
-            <ul className="space-y-3">
-              {h.pemeriksaan.map((c) => (
-                <li key={c.nama} className="flex gap-3 text-sm">
-                  {c.lulus ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-leaf-500" /> : <CircleX className="mt-0.5 size-5 shrink-0 text-flame-500" />}
-                  <span>
-                    <span className="font-semibold">{c.nama}</span>
-                    <span className="block text-ink-600">{c.keterangan}</span>
-                  </span>
-                </li>
-              ))}
+          {/* Langkah berikutnya */}
+          <Card className="print:hidden">
+            <SectionTitle title="Langkah berikutnya" />
+            <ul className="-mx-2 space-y-1">
+              <Langkah href={`/pencocokan?rencana=${r.id}`} icon={<ArrowLeftRight className="size-4" />} judul="Cocokkan baterai" ket="Pilih baterai yang sesuai rencana ini" />
+              <Langkah
+                href={`/kompatibilitas?rencana=${r.id}`}
+                icon={<PlugZap className="size-4" />}
+                judul="Cek kompatibilitas"
+                ket={kompat ? "Sudah diperiksa" : "Wajib sebelum pemasangan"}
+                status={kompat && <Badge tone={kompat.status === "layak" ? "leaf" : kompat.status === "tidak_layak" ? "flame" : "amber"}>{kompat.label}</Badge>}
+              />
+              <Langkah
+                href={`/ketahanan?rencana=${r.id}`}
+                icon={<CloudRain className="size-4" />}
+                judul="Simulasi ketahanan"
+                ket={hujan ? `Hujan: bertahan ${hujan.lama_bertahan_pelepasan_hari === null ? "tak terbatas" : `${num(hujan.lama_bertahan_pelepasan_hari)} hari`}` : "Uji saat mendung dan hujan"}
+              />
             </ul>
-            <div className="mt-4 flex items-center justify-between rounded-xl bg-ink-50 p-3 text-sm">
-              <span className="text-ink-600">Kompatibilitas</span>
-              {kompat ? (
-                <Badge tone={kompat.status === "layak" ? "leaf" : kompat.status === "tidak_layak" ? "flame" : "amber"}>{kompat.label}</Badge>
-              ) : (
-                <a href={`/kompatibilitas?rencana=${r.id}`} className="font-semibold text-sun-700 hover:underline">
-                  Cek sekarang
-                </a>
-              )}
-            </div>
           </Card>
 
           <Card>
-            <SectionTitle title="Parameter yang dipakai" />
+            <SectionTitle title="Dasar perhitungan" />
             <KeyValue
               items={[
-                ["Paket", h.parameter.nama_paket],
-                ["Kapasitas paket", `${num(h.parameter.kapasitas_paket_kwh)} kWh`],
-                ["SoH paket", `${num(h.parameter.soh_paket * 100)}%`],
-                ["PSH", `${num(h.parameter.psh_jam)} jam`],
-                ["PR", `${num(h.parameter.pr * 100)}%`],
-                ["Efisiensi η", `${num(h.parameter.efisiensi * 100)}%`],
-                ["DoD", `${num(h.parameter.dod * 100)}%`],
-                ["Jenis beban", m.jenis_beban.join(", ") || "—"],
-                ["Versi konfigurasi / model", `v${r.versiKonfigurasi} · ${r.versiModel}`],
-                ["Dibuat", `${tanggal(r.createdAt, true)} · ${r.dibuatOleh.nama}`],
+                ["Paket baterai", p.nama_paket],
+                ["Kapasitas × SoH", `${num(p.kapasitas_paket_kwh)} kWh × ${num(p.soh_paket * 100, 0)}%`],
+                ["Cadangan mendung", `${p.hari_cadangan} hari`],
+                ["Pemakaian malam", `${num(m.porsi_malam * 100, 0)}%`],
+                ["Jam matahari efektif", `${num(p.psh_jam)} jam`],
+                ["Batas pengosongan", `${num(p.dod * 100, 0)}%`],
+                ["Dibuat", `${tanggal(r.createdAt)} · ${r.dibuatOleh.nama}`],
               ]}
             />
           </Card>
+
           <form action={deletePlan} className="print:hidden">
             <input type="hidden" name="id" value={r.id} />
             <button className={buttonClass("ghost", "sm", "text-flame-600")}>
@@ -193,7 +186,34 @@ export default async function HasilRencanaPage({ params, searchParams }: PagePro
           </form>
         </div>
       </div>
-      <Disclaimer className="mt-6" />
+      <p className="mt-6 flex items-start gap-2 text-xs text-ink-500">
+        {gagal.length ? <CircleX className="size-4 shrink-0 text-flame-500" /> : <CheckCircle2 className="size-4 shrink-0 text-leaf-500" />}
+        Hasil ini estimasi berdasarkan isian dan parameter harga; sesuaikan dengan harga setempat sebelum pengadaan.
+      </p>
     </>
+  );
+}
+
+function Kotak({ label, nilai, tone = "bg-ink-50" }: { label: string; nilai: string; tone?: string }) {
+  return (
+    <div className={cn("rounded-2xl p-4", tone)}>
+      <p className="text-xs text-ink-500">{label}</p>
+      <p className="num mt-1 font-semibold">{nilai}</p>
+    </div>
+  );
+}
+
+function Langkah({ href, icon, judul, ket, status }: { href: string; icon: React.ReactNode; judul: string; ket: string; status?: React.ReactNode }) {
+  return (
+    <li>
+      <Link href={href} className="flex items-center gap-3 rounded-xl p-2 hover:bg-ink-50">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-sun-100 text-sun-700">{icon}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-ink-900">{judul}</span>
+          <span className="block truncate text-xs text-ink-500">{ket}</span>
+        </span>
+        {status ?? <ChevronRight className="size-4 shrink-0 text-ink-400" />}
+      </Link>
+    </li>
   );
 }

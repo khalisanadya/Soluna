@@ -3,8 +3,10 @@ import Link from "next/link";
 import { Suspense } from "react";
 import type { Prisma } from "@prisma/client";
 import { BatteryCharging, ChevronRight, Plus } from "lucide-react";
-import { Badge, ButtonLink, Card, EmptyState, GradeBadge, IlustrasiTag, PageHeader } from "@/components/ui";
+import { Badge, ButtonLink, Card, EmptyState, GradeBadge, IlustrasiTag, PageHeader, SohBadge } from "@/components/ui";
+import { Paginasi, bacaHalaman } from "@/components/paginasi";
 import { requireUser } from "@/lib/auth";
+import { getActiveConfig } from "@/lib/config";
 import { bateraiScope } from "@/lib/data";
 import { num } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -40,12 +42,22 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
       : {}),
   };
 
+  const total = await prisma.baterai.count({ where });
+  const { halaman, skip, take } = bacaHalaman(sp, total);
+
   const [rows, pemasok] = await Promise.all([
-    prisma.baterai.findMany({ where, orderBy: { kode: "asc" }, include: { pemasok: { select: { id: true, namaPerusahaan: true } } } }),
+    prisma.baterai.findMany({
+      where,
+      orderBy: { kode: "asc" },
+      skip,
+      take,
+      include: { pemasok: { select: { id: true, namaPerusahaan: true } } },
+    }),
     user.peran === "ADMIN" ? prisma.pemasok.findMany({ orderBy: { namaPerusahaan: "asc" }, select: { id: true, namaPerusahaan: true } }) : [],
   ]);
   const filtered = Boolean(q || status || grade || kimia || pemasokId);
   const isAdmin = user.peran === "ADMIN";
+  const { data: cfg } = await getActiveConfig();
 
   return (
     <>
@@ -60,7 +72,7 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
         }
       />
 
-      <Suspense fallback={<div className="mb-4 h-[4.25rem] rounded-[var(--radius-card)] bg-surface ring-1 ring-ink-200/60" />}>
+      <Suspense fallback={<div className="mb-4 h-[9.75rem] rounded-[var(--radius-card)] bg-surface ring-1 ring-ink-200/60" />}>
         <FilterForm kimia={JENIS_KIMIA} pemasok={isAdmin ? pemasok : null} />
       </Suspense>
 
@@ -73,9 +85,8 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
         />
       ) : (
         <>
-          <p className="mb-2 text-sm text-ink-500">{rows.length} baterai</p>
           {/* Desktop: tabel */}
-          <Card className="hidden overflow-hidden p-0 sm:p-0 md:block">
+          <Card className="hidden overflow-hidden !p-0 md:block">
             <table className="w-full text-left text-sm">
               <thead className="bg-ink-50 text-xs text-ink-500">
                 <tr>
@@ -83,8 +94,8 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                   <th className="px-3 py-3 font-medium">Baterai</th>
                   {isAdmin && <th className="px-3 py-3 font-medium">Pemasok</th>}
                   <th className="px-3 py-3 text-right font-medium">Kapasitas</th>
-                  <th className="px-3 py-3 font-medium">Status</th>
-                  <th className="px-3 py-3 text-right font-medium">SoH</th>
+                  <th className="w-24 px-2 py-3 text-center font-medium">Status</th>
+                  <th className="w-24 px-2 py-3 text-center font-medium">SoH</th>
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
@@ -113,10 +124,14 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                       </td>
                     )}
                     <td className="num px-3 py-3 text-right">{num(b.kapasitasAwalKwh)} kWh</td>
-                    <td className="px-3 py-3">
-                      <GradeBadge grade={b.gradeTerakhir} size="sm" />
+                    <td className="px-2 py-3">
+                      <div className="flex justify-center">
+                        <GradeBadge grade={b.gradeTerakhir} size="sm" />
+                      </div>
                     </td>
-                    <td className="num px-3 py-3 text-right">{b.sohTerakhir !== null ? `${num(b.sohTerakhir)}%` : "—"}</td>
+                    <td className="px-2 py-3 text-center">
+                      <SohBadge soh={b.sohTerakhir} tinggi={cfg.grade.A} rendah={cfg.grade.C} />
+                    </td>
                     <td className="px-5 py-3 text-right">
                       {isAdmin ? (
                         <ButtonLink href={`/penilaian/baru?baterai=${b.id}`} size="sm" variant={b.status === "DINILAI" ? "secondary" : "dark"}>
@@ -146,11 +161,12 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                     </span>
                     {isAdmin && <span className="block truncate text-xs text-ink-500">{b.pemasok.namaPerusahaan}</span>}
                   </span>
-                  {b.status === "DINILAI" ? <Badge tone="leaf">{num(b.sohTerakhir)}%</Badge> : <Badge tone="sun">Menunggu</Badge>}
+                  {b.status === "DINILAI" ? <SohBadge soh={b.sohTerakhir} tinggi={cfg.grade.A} rendah={cfg.grade.C} /> : <Badge tone="sun">Menunggu</Badge>}
                 </Link>
               </li>
             ))}
           </ul>
+          <Paginasi basePath="/baterai" sp={sp} halaman={halaman} total={total} tampil={rows.length} satuan="baterai" />
         </>
       )}
     </>

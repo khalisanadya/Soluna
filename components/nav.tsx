@@ -101,11 +101,11 @@ export function AppNav({ user }: { user: NavUser }) {
     <>
       <WelcomeDialog nama={user.nama} peran={user.peran} />
       {/* Desktop: sidebar berlabel */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden print:!hidden w-64 flex-col border-r border-ink-200/70 bg-canvas px-4 py-5 lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden print:!hidden w-64 flex-col border-r border-ink-200 bg-sidebar px-4 py-5 lg:flex">
         <Link href="/dashboard" className="px-2">
           <Logo size={30} />
         </Link>
-        <nav className="mt-8 flex-1 space-y-6 overflow-y-auto" aria-label="Navigasi utama">
+        <nav className="-mx-1 mt-8 flex-1 space-y-6 overflow-y-auto px-1 [scrollbar-color:var(--color-ink-300)_transparent] [scrollbar-width:thin]" aria-label="Navigasi utama">
           {groups.map((g) => (
             <div key={g.title}>
               {g.title !== "Ringkasan" && <p className="eyebrow mb-2 px-3">{g.title}</p>}
@@ -119,7 +119,7 @@ export function AppNav({ user }: { user: NavUser }) {
                         aria-current={active ? "page" : undefined}
                         className={cn(
                           "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                          active ? "bg-ink-900 text-white shadow-soft" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+                          active ? "bg-ink-900 text-white shadow-soft" : "text-ink-600 hover:bg-white/70 hover:text-ink-900",
                         )}
                       >
                         <it.icon className={cn("size-[1.1rem]", active ? "text-sun-400" : "text-ink-400")} />
@@ -145,11 +145,11 @@ export function AppNav({ user }: { user: NavUser }) {
       </aside>
 
       {/* Tablet: rel ikon dengan label kecil */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden print:!hidden w-20 flex-col items-center border-r border-ink-200/70 bg-canvas py-5 md:flex lg:hidden">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden print:!hidden w-20 flex-col items-center border-r border-ink-200 bg-sidebar py-5 md:flex lg:hidden">
         <Link href="/dashboard" aria-label="SOLUNA">
           <Logo size={30} withText={false} />
         </Link>
-        <nav className="mt-6 flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Navigasi utama">
+        <nav className="mt-6 flex flex-1 flex-col gap-1 overflow-y-auto [scrollbar-width:none]" aria-label="Navigasi utama">
           {items.map((it) => {
             const active = isActive(pathname, it.href, hrefs);
             return (
@@ -159,7 +159,7 @@ export function AppNav({ user }: { user: NavUser }) {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex w-16 flex-col items-center gap-1 rounded-xl py-2 text-[0.62rem] font-medium",
-                  active ? "bg-ink-900 text-white" : "text-ink-500 hover:bg-ink-100",
+                  active ? "bg-ink-900 text-white" : "text-ink-500 hover:bg-white/70",
                 )}
               >
                 <it.icon className={cn("size-5", active ? "text-sun-400" : "")} />
@@ -174,7 +174,7 @@ export function AppNav({ user }: { user: NavUser }) {
       </aside>
 
       {/* Ponsel: bilah atas + tab bawah */}
-      <header className="sticky top-0 z-30 flex print:hidden items-center justify-between border-b border-ink-200/70 bg-canvas/90 px-4 py-3 backdrop-blur md:hidden">
+      <header className="sticky top-0 z-30 flex print:hidden items-center justify-between border-b border-ink-200 bg-sidebar/90 px-4 py-3 backdrop-blur md:hidden">
         <Link href="/dashboard">
           <Logo size={26} />
         </Link>
@@ -247,10 +247,10 @@ export function AppNav({ user }: { user: NavUser }) {
 export function NavSkeleton() {
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-ink-200/70 bg-canvas px-6 py-5 lg:block">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-ink-200 bg-sidebar px-6 py-5 lg:block">
         <Logo size={30} />
       </aside>
-      <aside className="fixed inset-y-0 left-0 hidden w-20 border-r border-ink-200/70 bg-canvas py-5 md:flex md:justify-center lg:hidden">
+      <aside className="fixed inset-y-0 left-0 hidden w-20 border-r border-ink-200 bg-sidebar py-5 md:flex md:justify-center lg:hidden">
         <Logo size={30} withText={false} />
       </aside>
       <header className="flex items-center border-b border-ink-200/70 px-4 py-3 md:hidden">

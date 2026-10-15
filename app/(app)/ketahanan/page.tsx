@@ -55,7 +55,7 @@ export default async function KetahananPage({ searchParams }: PageProps<"/ketaha
   return (
     <>
       <PageHeader
-        eyebrow="Modul B · Ketahanan desa"
+        eyebrow="Perencanaan"
         title="Berapa lama desa bertahan?"
         description="Uji cuaca normal, mendung panjang, dan hujan beberapa hari. Lepas beban bertahap agar beban kritis tetap menyala. Ini simulasi — sistem tidak mengendalikan beban nyata."
       />

@@ -217,3 +217,13 @@ def test_pencocokan_status(rencana):
     assert res["d"]["status"] == "tidak_direkomendasikan" and res["d"]["daur_ulang"]
     assert res["tl"]["status"] == "tidak_direkomendasikan"
     assert res["baru"]["status"] == "belum_dinilai"
+
+
+def test_harga_diesel_dari_masukan():
+    """Harga solar per rencana menggantikan rentang konfigurasi untuk biaya diesel per rumah."""
+    base = dict(jumlah_rumah=50, konsumsi_per_rumah_kwh=1, porsi_malam=0.6, paket=PaketInput(kapasitas_kwh=50, soh=0.7))
+    out = plan(PlanInput(**base, harga_diesel_rendah=10000, harga_diesel_tinggi=15000), CFG)
+    liter = out["lingkungan"]["diesel_hemat_liter"]
+    assert out["biaya"]["diesel_per_rumah"]["rendah"] == pytest.approx(liter * 10000 / 50, rel=1e-3)
+    assert out["biaya"]["diesel_per_rumah"]["tinggi"] == pytest.approx(liter * 15000 / 50, rel=1e-3)
+    assert out["parameter"]["harga_diesel_rendah"] == 10000

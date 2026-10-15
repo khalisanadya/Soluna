@@ -14,7 +14,6 @@ export async function getBateraiForUser(user: CurrentUser, id: string) {
     where: { id, ...bateraiScope(user) },
     include: {
       pemasok: true,
-      berkas: { orderBy: { createdAt: "desc" } },
       penilaian: { orderBy: { createdAt: "desc" }, include: { penilai: { select: { nama: true } } } },
       bacaanSoh: { orderBy: { tanggal: "asc" } },
     },

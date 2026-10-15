@@ -58,6 +58,9 @@ export type HasilRencana = {
     periode_hari: number;
     nama_paket: string;
     sumber_paket: "bawaan" | "baterai";
+    /** Ada pada rencana yang dibuat dengan isian harga solar. */
+    harga_diesel_rendah?: number;
+    harga_diesel_tinggi?: number;
   };
   pemeriksaan: { nama: string; lulus: boolean; keterangan: string }[];
   lingkungan: { diesel_hemat_liter: number; co2_dihindari_kg: number; periode_hari: number };

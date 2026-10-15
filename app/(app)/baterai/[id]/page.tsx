@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ClipboardCheck, FileText, ImageIcon, Pencil, ScrollText, Trash2 } from "lucide-react";
-import { deleteBerkas } from "@/app/actions/baterai";
+import { ClipboardCheck, Pencil, ScrollText } from "lucide-react";
 import { TrendLine } from "@/components/charts";
 import { ButtonLink, Card, EmptyState, GradeBadge, IlustrasiTag, KeyValue, Notice, PageHeader, Progress, SectionTitle, gradeTone } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
 import { getBateraiForUser } from "@/lib/data";
-import { num, tanggal } from "@/lib/format";
+import { num, rentangUmur, tanggal, umur } from "@/lib/format";
 import type { Grade, HasilPenilaian } from "@/lib/types";
-import { UploadForm } from "./upload-form";
 
 export const metadata: Metadata = { title: "Detail Baterai" };
 
@@ -74,12 +72,9 @@ export default async function DetailBateraiPage({ params, searchParams }: PagePr
                   <Progress value={latest.soh} className="mt-2" color={gradeTone[latest.grade as Grade].bg} />
                 </div>
                 <div>
-                  <p className="text-xs text-ink-500">Sisa umur</p>
-                  <p className="num mt-1 text-2xl">
-                    {num(latest.sisaUmurBawah)}–{num(latest.sisaUmurAtas)}
-                    <span className="ml-1 text-sm text-ink-500">thn</span>
-                  </p>
-                  <p className="text-xs text-ink-500">tengah {num(latest.sisaUmurTengah)} tahun</p>
+                  <p className="text-xs text-ink-500">Perkiraan sisa umur</p>
+                  <p className="num mt-1 text-2xl">{rentangUmur(latest.sisaUmurBawah, latest.sisaUmurAtas)}</p>
+                  <p className="text-xs text-ink-500">paling mungkin {umur(latest.sisaUmurTengah)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-ink-500">Keyakinan</p>
@@ -171,39 +166,6 @@ export default async function DetailBateraiPage({ params, searchParams }: PagePr
             </Card>
           )}
 
-          <Card>
-            <SectionTitle title="Foto & dokumen" hint={`${b.berkas.length} berkas`} />
-            {b.berkas.length > 0 && (
-              <ul className="mb-4 space-y-2">
-                {b.berkas.map((f) => (
-                  <li key={f.id} className="flex items-center gap-3 rounded-xl bg-ink-50 p-2 pr-3">
-                    {f.jenis === "FOTO" ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={`/api/berkas/${f.id}`} alt={f.namaBerkas} className="size-11 rounded-lg object-cover" />
-                    ) : (
-                      <span className="grid size-11 place-items-center rounded-lg bg-surface text-ink-500">
-                        <FileText className="size-5" />
-                      </span>
-                    )}
-                    <a href={`/api/berkas/${f.id}`} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-sm font-medium hover:underline">
-                      {f.namaBerkas}
-                      <span className="block text-xs font-normal text-ink-500">
-                        {f.jenis === "FOTO" ? <ImageIcon className="mr-1 inline size-3" /> : null}
-                        {num(f.ukuran / 1024, 0)} KB
-                      </span>
-                    </a>
-                    <form action={deleteBerkas}>
-                      <input type="hidden" name="id" value={f.id} />
-                      <button className="grid size-8 place-items-center rounded-lg text-ink-400 hover:bg-flame-50 hover:text-flame-600" aria-label={`Hapus ${f.namaBerkas}`}>
-                        <Trash2 className="size-4" />
-                      </button>
-                    </form>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <UploadForm bateraiId={b.id} />
-          </Card>
         </div>
       </div>
     </>

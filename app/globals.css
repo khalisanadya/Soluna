@@ -71,6 +71,8 @@
 
   --color-canvas: #f5f4ef;
   --color-surface: #ffffff;
+  /* Sidebar: krem hangat sedikit lebih gelap dari canvas, agar terpisah dari area konten. */
+  --color-sidebar: #e9e5dc;
 
   --radius-card: 1.5rem;
   --shadow-soft: 0 1px 2px rgb(28 27 25 / 0.04), 0 8px 24px -12px rgb(28 27 25 / 0.12);

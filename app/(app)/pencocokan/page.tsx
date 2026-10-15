@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2, CircleHelp, Recycle, SunMedium, Wrench } from "lucide-react";
-import { Badge, ButtonLink, Card, Disclaimer, EmptyState, GradeBadge, IlustrasiTag, Notice, PageHeader, SectionTitle, Stat, buttonClass, inputClass } from "@/components/ui";
+import { Suspense } from "react";
+import { SunMedium } from "lucide-react";
+import { Badge, ButtonLink, Card, Disclaimer, EmptyState, GradeBadge, IlustrasiTag, Notice, PageHeader, SectionTitle, buttonClass } from "@/components/ui";
+import { Paginasi, potong } from "@/components/paginasi";
 import { cocokkanBaterai } from "@/lib/analisis";
 import { requireAdmin } from "@/lib/auth";
 import { cn, num, tanggal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { HasilRencana, StatusCocok } from "@/lib/types";
+import { PencocokanFilter } from "./filter";
 
 export const metadata: Metadata = { title: "Pencocokan Baterai" };
 
@@ -28,7 +31,7 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
 
   const header = (
     <PageHeader
-      eyebrow="Baterai · Pencocokan"
+      eyebrow="Baterai"
       title="Pencocokan baterai"
       description="Bandingkan baterai yang tersedia dengan kebutuhan satu rencana desa. Status disusun dari grade, ambang penggantian, daya puncak, dan hasil pemeriksaan kompatibilitas."
     />
@@ -69,69 +72,78 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
     ).map((b) => [b.id, b]),
   );
 
+  const str = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string).trim() : "");
+  const q = str("q").toLowerCase();
+  const grade = ["A", "B", "C", "D"].includes(str("grade")) ? str("grade") : "";
+  const status = str("status") as StatusCocok | "";
+  const semua = res.ok ? res.data.baterai : [];
+  // Jumlah per status mengikuti filter grade dan pencarian yang sedang aktif.
+  const dasar = semua.filter((r) => {
+    const b = detail.get(r.id);
+    if (grade && (r.status === "belum_dinilai" || b?.gradeTerakhir !== grade)) return false;
+    if (q && ![r.kode, b?.merek, b?.model, b?.pemasok.namaPerusahaan].some((x) => x?.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const jumlah = {
+    semua: dasar.length,
+    direkomendasikan: 0,
+    perlu_penyesuaian: 0,
+    tidak_direkomendasikan: 0,
+    belum_dinilai: 0,
+  } satisfies Record<StatusCocok | "semua", number>;
+  for (const r of dasar) jumlah[r.status]++;
+  const tersaring = status && status in jumlah ? dasar.filter((r) => r.status === status) : dasar;
+  const hal = potong(tersaring, sp);
+
   return (
     <>
       {header}
 
-      <Card className="mb-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <form className="flex w-full max-w-xl flex-col gap-2 sm:flex-row sm:items-end">
-            <label className="flex-1">
-              <span className="mb-1.5 block text-sm font-medium text-ink-800">Rencana desa</span>
-              <select name="rencana" defaultValue={terpilih.id} className={inputClass}>
-                {rencana.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.namaDesa} — {r.nama} ({tanggal(r.createdAt)})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button className={buttonClass("dark", "md")}>Cocokkan</button>
-          </form>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-            {[
-              ["Kebutuhan malam", `${num(hasil.ringkasan.kebutuhan_malam_kwh)} kWh`],
-              ["Daya puncak", `${num(hasil.ringkasan.daya_puncak_kw)} kW`],
-              ["Batas pengosongan", `${num(hasil.parameter.dod * 100, 0)}%`],
-              ["Hari cadangan", `${hasil.parameter.hari_cadangan} hari`],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-xs text-ink-500">{k}</dt>
-                <dd className="num font-semibold text-ink-900">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-        <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-500">
-          Kebutuhan diambil dari hasil perhitungan rencana{" "}
-          <Link href={`/perencana/${terpilih.id}`} className="font-medium text-ink-700 underline-offset-2 hover:underline">
-            {terpilih.namaDesa} — {terpilih.nama}
+      <Suspense fallback={<div className="mb-4 h-[14rem] rounded-[var(--radius-card)] bg-surface ring-1 ring-ink-200/60" />}>
+        <PencocokanFilter
+          rencana={rencana.map((r) => ({ id: r.id, label: `${r.namaDesa} — ${r.nama} · ${tanggal(r.createdAt)}` }))}
+          terpilihId={terpilih.id}
+          jumlah={jumlah}
+        />
+      </Suspense>
+
+      <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl bg-ink-50 px-4 py-3 text-sm ring-1 ring-ink-100">
+        <span className="flex items-center gap-2 text-xs text-ink-500">
+          Kebutuhan rencana
+          <Link href={`/perencana/${terpilih.id}`} className="font-medium text-ink-700 hover:underline">
+            {terpilih.namaDesa}
           </Link>
           {terpilih.ilustrasi && <IlustrasiTag />}
-        </p>
-      </Card>
+        </span>
+        {[
+          ["Kebutuhan malam", `${num(hasil.ringkasan.kebutuhan_malam_kwh)} kWh`],
+          ["Daya puncak", `${num(hasil.ringkasan.daya_puncak_kw)} kW`],
+          ["Batas pengosongan", `${num(hasil.parameter.dod * 100, 0)}%`],
+          ["Hari cadangan", `${hasil.parameter.hari_cadangan} hari`],
+        ].map(([k, v]) => (
+          <span key={k}>
+            <span className="text-ink-500">{k}</span> <span className="num font-semibold text-ink-900">{v}</span>
+          </span>
+        ))}
+      </div>
 
       {!res.ok ? (
         <Notice tone="danger" title="Pencocokan belum dapat dihitung">
           {res.error}
         </Notice>
-      ) : res.data.baterai.length === 0 ? (
+      ) : semua.length === 0 ? (
         <EmptyState title="Belum ada baterai" description="Baterai yang didaftarkan pemasok akan muncul di sini." />
+      ) : tersaring.length === 0 ? (
+        <EmptyState title="Tidak ada baterai yang cocok" description="Ubah kata kunci, grade, atau status." />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            <Stat label="Direkomendasikan" value={res.data.ringkasan.direkomendasikan} icon={<CheckCircle2 className="size-4" />} accent="leaf" />
-            <Stat label="Perlu penyesuaian" value={res.data.ringkasan.perlu_penyesuaian} icon={<Wrench className="size-4" />} accent="sun" />
-            <Stat label="Tidak direkomendasikan" value={res.data.ringkasan.tidak_direkomendasikan} icon={<Recycle className="size-4" />} accent="flame" />
-            <Stat label="Belum dinilai" value={res.data.ringkasan.belum_dinilai} icon={<CircleHelp className="size-4" />} accent="ink" href="/penilaian" />
-          </div>
 
-          <Card className="mt-4 p-0 sm:p-0">
+          <Card className="!p-0">
             <div className="p-5 pb-0 sm:p-6 sm:pb-0">
               <SectionTitle title="Hasil pencocokan" hint="Diurutkan dari status terbaik, lalu jumlah paket paling sedikit" />
             </div>
             <ul className="divide-y divide-ink-100">
-              {res.data.baterai.map((r) => {
+              {hal.rows.map((r) => {
                 const b = detail.get(r.id);
                 const k = kompat.get(r.id);
                 return (
@@ -196,6 +208,7 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
               })}
             </ul>
           </Card>
+          <Paginasi basePath="/pencocokan" sp={sp} halaman={hal.halaman} total={tersaring.length} tampil={hal.rows.length} satuan="baterai" />
           <p className="mt-3 text-xs text-ink-500">{res.data.catatan}</p>
           <Disclaimer className="mt-4" />
         </>

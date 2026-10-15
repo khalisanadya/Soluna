@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarClock, ClipboardCheck, CloudRain, PlugZap, SunMedium } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader, buttonClass } from "@/components/ui";
+import { Paginasi, bacaHalaman } from "@/components/paginasi";
 import { requireAdmin } from "@/lib/auth";
-import { days, num, tanggal } from "@/lib/format";
+import { days, num, rentangUmur, tanggal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { HasilKetahanan, HasilKompatibilitas, HasilRencana } from "@/lib/types";
 
@@ -24,13 +25,25 @@ export default async function RiwayatPage({ searchParams }: PageProps<"/riwayat"
   await requireAdmin();
   const sp = await searchParams;
   const f = typeof sp.jenis === "string" ? sp.jenis : "";
-  const take = 40;
+  const ambil = (k: string) => !f || f === k;
+  const whereBacaan = { sumber: "MANUAL" as const };
+  // Hitung total dulu, lalu ambil cukup baris dari tiap sumber untuk halaman yang diminta.
+  const jumlah = await Promise.all([
+    ambil("penilaian") ? prisma.penilaian.count() : 0,
+    ambil("rencana") ? prisma.rencanaDesa.count() : 0,
+    ambil("simulasi") ? prisma.simulasiKetahanan.count() : 0,
+    ambil("kompatibilitas") ? prisma.cekKompatibilitas.count() : 0,
+    ambil("bacaan") ? prisma.bacaanSoh.count({ where: whereBacaan }) : 0,
+  ]);
+  const total = jumlah.reduce((a, b) => a + b, 0);
+  const { halaman, skip, take: perHalaman } = bacaHalaman(sp, total);
+  const take = skip + perHalaman;
   const [penilaian, rencana, simulasi, kompat, bacaan] = await Promise.all([
-    !f || f === "penilaian" ? prisma.penilaian.findMany({ orderBy: { createdAt: "desc" }, take, include: { baterai: { select: { kode: true } } } }) : [],
-    !f || f === "rencana" ? prisma.rencanaDesa.findMany({ orderBy: { createdAt: "desc" }, take }) : [],
-    !f || f === "simulasi" ? prisma.simulasiKetahanan.findMany({ orderBy: { createdAt: "desc" }, take, include: { rencana: { select: { id: true } } } }) : [],
-    !f || f === "kompatibilitas" ? prisma.cekKompatibilitas.findMany({ orderBy: { createdAt: "desc" }, take, include: { baterai: { select: { kode: true, id: true } } } }) : [],
-    !f || f === "bacaan" ? prisma.bacaanSoh.findMany({ where: { sumber: "MANUAL" }, orderBy: { createdAt: "desc" }, take, include: { baterai: { select: { kode: true, id: true } } } }) : [],
+    ambil("penilaian") ? prisma.penilaian.findMany({ orderBy: { createdAt: "desc" }, take, include: { baterai: { select: { kode: true } } } }) : [],
+    ambil("rencana") ? prisma.rencanaDesa.findMany({ orderBy: { createdAt: "desc" }, take }) : [],
+    ambil("simulasi") ? prisma.simulasiKetahanan.findMany({ orderBy: { createdAt: "desc" }, take, include: { rencana: { select: { id: true } } } }) : [],
+    ambil("kompatibilitas") ? prisma.cekKompatibilitas.findMany({ orderBy: { createdAt: "desc" }, take, include: { baterai: { select: { kode: true, id: true } } } }) : [],
+    ambil("bacaan") ? prisma.bacaanSoh.findMany({ where: whereBacaan, orderBy: { createdAt: "desc" }, take, include: { baterai: { select: { kode: true, id: true } } } }) : [],
   ]);
 
   const items: Item[] = [
@@ -39,7 +52,7 @@ export default async function RiwayatPage({ searchParams }: PageProps<"/riwayat"
       jenis: "Penilaian",
       waktu: p.createdAt,
       judul: `${p.baterai.kode} → grade ${p.grade}`,
-      detail: `SoH ${num(p.soh)}% · sisa umur ${num(p.sisaUmurBawah)}–${num(p.sisaUmurAtas)} th · keyakinan ${num(p.keyakinan, 0)}%`,
+      detail: `SoH ${num(p.soh)}% · sisa umur ${rentangUmur(p.sisaUmurBawah, p.sisaUmurAtas)} · keyakinan ${num(p.keyakinan, 0)}%`,
       href: `/penilaian/${p.id}`,
       versi: `v${p.versiKonfigurasi}`,
       icon: ClipboardCheck,
@@ -98,11 +111,13 @@ export default async function RiwayatPage({ searchParams }: PageProps<"/riwayat"
       icon: CalendarClock,
       tone: "bg-flame-50 text-flame-600",
     })),
-  ].sort((a, b) => +b.waktu - +a.waktu);
+  ]
+    .sort((a, b) => +b.waktu - +a.waktu)
+    .slice(skip, skip + perHalaman);
 
   return (
     <>
-      <PageHeader eyebrow="Lainnya" title="Riwayat" description="Semua hasil tersimpan beserta versi konfigurasi yang dipakai, agar setiap angka dapat ditelusuri ulang." />
+      <PageHeader eyebrow="Pemantauan" title="Riwayat" description="Semua hasil tersimpan beserta versi konfigurasi yang dipakai, agar setiap angka dapat ditelusuri ulang." />
       <div className="mb-4 flex flex-wrap gap-2">
         {FILTER.map((x) => (
           <Link key={x.k || "semua"} href={x.k ? `/riwayat?jenis=${x.k}` : "/riwayat"} className={buttonClass(f === x.k ? "dark" : "secondary", "sm")}>
@@ -113,6 +128,7 @@ export default async function RiwayatPage({ searchParams }: PageProps<"/riwayat"
       {items.length === 0 ? (
         <EmptyState title="Belum ada riwayat" />
       ) : (
+        <>
         <Card className="p-3 sm:p-4">
           <ul className="divide-y divide-ink-100">
             {items.map((it) => {
@@ -146,6 +162,8 @@ export default async function RiwayatPage({ searchParams }: PageProps<"/riwayat"
             })}
           </ul>
         </Card>
+        <Paginasi basePath="/riwayat" sp={sp} halaman={halaman} total={total} tampil={items.length} satuan="riwayat" />
+        </>
       )}
     </>
   );

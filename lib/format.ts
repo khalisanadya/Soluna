@@ -55,3 +55,23 @@ export function formNumber(fd: FormData, key: string): number | undefined {
 export function formString(fd: FormData, key: string): string {
   return String(fd.get(key) ?? "").trim();
 }
+
+/** Lama waktu yang mudah dibaca: di bawah 1 tahun ditulis dalam bulan (0,3 tahun → "4 bulan"). */
+export function umur(tahun: number | null | undefined): string {
+  if (tahun === null || tahun === undefined || Number.isNaN(tahun)) return "—";
+  if (tahun < 1 / 12) return "< 1 bulan";
+  if (Math.round(tahun * 12) < 12) return `${Math.round(tahun * 12)} bulan`;
+  return `${num(tahun, 1)} tahun`;
+}
+
+/** Rentang sisa umur: "4–7 bulan", "4 bulan – 1,5 tahun", "2–3,5 tahun", "hingga 5 bulan", atau satu nilai bila keduanya sama setelah dibulatkan. */
+export function rentangUmur(bawah: number, atas: number): string {
+  const a = umur(bawah);
+  const b = umur(atas);
+  if (a === b) return a.startsWith("<") ? a : `± ${a}`;
+  if (atas < 1 / 12) return "< 1 bulan";
+  if (bawah < 1 / 12) return `hingga ${b}`;
+  if (bawah >= 1) return `${num(bawah, 1)}–${num(atas, 1)} tahun`;
+  if (Math.round(atas * 12) < 12 && bawah >= 1 / 12) return `${Math.round(bawah * 12)}–${Math.round(atas * 12)} bulan`;
+  return `${a} – ${b}`;
+}

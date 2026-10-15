@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import {
   AlertTriangle,
   BatteryCharging,
@@ -21,7 +20,6 @@ import { engineHealth } from "@/lib/engine";
 import { cn, days, num, rupiahShort, tanggal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { HasilKetahanan, HasilKompatibilitas, HasilRencana, Rentang } from "@/lib/types";
-import { GradeDistribution } from "./grade-distribution";
 
 /* Dashboard Pengelola Sistem Desa.
    Semua angka berasal dari basis data atau hasil mesin hitung yang tersimpan; tidak ada angka contoh.
@@ -132,7 +130,7 @@ export async function AdminDashboard() {
           unit="baterai"
           icon={<Clock3 className="size-4" />}
           accent="sun"
-          hint="Baterai dari pemasok yang belum dinilai"
+          hint="Dari pemasok"
           href="/penilaian"
         />
         <Stat
@@ -141,7 +139,7 @@ export async function AdminDashboard() {
           unit="baterai"
           icon={<CheckCircle2 className="size-4" />}
           accent="leaf"
-          hint="Grade A–C dari penilaian terakhir"
+          hint="Grade A–C"
           href="/pencocokan"
         />
         <Stat
@@ -159,7 +157,7 @@ export async function AdminDashboard() {
           unit={siklusOk ? "baterai" : undefined}
           icon={<AlertTriangle className="size-4" />}
           accent="sky"
-          hint={siklusOk ? "Mendekati ambang penggantian" : dinilai.length ? "Butuh mesin hitung aktif" : "Belum ada baterai dinilai"}
+          hint={siklusOk ? "Mendekati ambang ganti" : dinilai.length ? "Butuh mesin hitung aktif" : "Belum ada baterai dinilai"}
           href="/siklus-hidup"
         />
       </div>
@@ -196,7 +194,7 @@ export async function AdminDashboard() {
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <SectionTitle
-            title="Baterai yang perlu ditindaklanjuti"
+            title="Perlu ditindaklanjuti"
             hint={perluTindakan.length ? `${perluTindakan.length} tindakan` : undefined}
             action={
               <Link href="/baterai" className="text-sm font-semibold text-sun-700 hover:underline">
@@ -211,66 +209,71 @@ export async function AdminDashboard() {
           )}
           {perluTindakan.length ? (
             <ul className="-mx-2 divide-y divide-ink-100">
-              {perluTindakan.slice(0, 8).map((t) => (
-                <li key={t.id} className="flex items-center gap-3 px-2 py-3">
-                  <GradeBadge grade={t.grade} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-center gap-2">
-                      <span className="num text-sm font-semibold">{t.kode}</span>
-                      <Badge tone={t.tone}>{t.jenis}</Badge>
-                    </p>
-                    <p className="mt-0.5 text-sm text-ink-600">{t.alasan}</p>
-                  </div>
-                  <Link
-                    href={t.aksi.href}
-                    className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ink-800 ring-1 ring-ink-200 transition-colors hover:bg-ink-100"
-                  >
-                    {t.aksi.label}
-                    <ChevronRight className="size-3.5" />
+              {perluTindakan.slice(0, MAKS).map((t) => (
+                <li key={t.id}>
+                  <Link href={t.aksi.href} className="flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-ink-50">
+                    <GradeBadge grade={t.grade} size="sm" />
+                    <span className="num w-20 shrink-0 text-sm font-semibold">{t.kode}</span>
+                    <Badge tone={t.tone} className="shrink-0">
+                      {t.jenis}
+                    </Badge>
+                    <span className="hidden min-w-0 flex-1 truncate text-sm text-ink-500 sm:block">{t.alasan}</span>
+                    <span className="ml-auto inline-flex shrink-0 items-center text-sm font-semibold text-ink-800">
+                      {t.aksi.label}
+                      <ChevronRight className="size-3.5" />
+                    </span>
                   </Link>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="rounded-2xl bg-leaf-50 p-4 text-sm text-leaf-700 ring-1 ring-leaf-100">
-              Tidak ada baterai yang perlu ditindaklanjuti saat ini.
+            <p className="text-sm text-leaf-700">Tidak ada baterai yang perlu ditindaklanjuti.</p>
+          )}
+          {perluTindakan.length > MAKS && (
+            <p className="mt-2 text-xs text-ink-500">
+              +{perluTindakan.length - MAKS} lainnya di{" "}
+              <Link href="/pencocokan" className="font-medium text-ink-700 hover:underline">
+                Pencocokan
+              </Link>{" "}
+              dan{" "}
+              <Link href="/siklus-hidup" className="font-medium text-ink-700 hover:underline">
+                Siklus Hidup
+              </Link>
+              .
             </p>
           )}
-          {perluTindakan.length > 8 && <p className="mt-3 text-xs text-ink-500">Menampilkan 8 dari {perluTindakan.length} tindakan.</p>}
         </Card>
-        <GradeDistribution counts={counts} />
-      </div>
 
-      <Card className="mt-4">
-        <SectionTitle
-          title="Aktivitas terbaru"
-          action={
-            <Link href="/riwayat" className="text-sm font-semibold text-sun-700 hover:underline">
-              Riwayat lengkap
-            </Link>
-          }
-        />
-        {aktivitas.length ? (
-          <ul className="-mx-2 divide-y divide-ink-100">
-            {aktivitas.map((a) => (
-              <li key={a.id}>
-                <Link href={a.href} className="flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-ink-50">
-                  <span className={cn("grid size-8 shrink-0 place-items-center rounded-full", a.tone)}>
-                    <a.icon className="size-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-ink-900">{a.judul}</span>
-                    <span className="block truncate text-xs text-ink-500">{a.detail}</span>
-                  </span>
-                  <span className="shrink-0 text-xs text-ink-500">{tanggal(a.waktu, true)}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-ink-500">Belum ada aktivitas yang tercatat.</p>
-        )}
-      </Card>
+        <Card>
+          <SectionTitle
+            title="Aktivitas terbaru"
+            action={
+              <Link href="/riwayat" className="text-sm font-semibold text-sun-700 hover:underline">
+                Riwayat
+              </Link>
+            }
+          />
+          {aktivitas.length ? (
+            <ul className="-mx-2 divide-y divide-ink-100">
+              {aktivitas.map((a) => (
+                <li key={a.id}>
+                  <Link href={a.href} className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-ink-50">
+                    <span className={cn("grid size-7 shrink-0 place-items-center rounded-full", a.tone)}>
+                      <a.icon className="size-3.5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-ink-900">{a.judul}</span>
+                      <span className="block truncate text-xs text-ink-500">{tanggal(a.waktu, true)}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-ink-500">Belum ada aktivitas yang tercatat.</p>
+          )}
+        </Card>
+      </div>
     </>
   );
 }
@@ -287,24 +290,24 @@ type TindakLanjut = {
 
 /* ---------- Ringkasan energi dari rencana terakhir ---------- */
 
-function Sumber({ jenis }: { jenis: "input" | "hitung" | "simulasi" }) {
+const MAKS = 5;
+
+function Sumber({ jenis }: { jenis: "hitung" | "simulasi" }) {
   const map = {
-    input: { t: "Input", c: "bg-ink-100 text-ink-600" },
     hitung: { t: "Hasil hitung", c: "bg-sun-100 text-sun-800" },
     simulasi: { t: "Simulasi", c: "bg-sky-50 text-sky-600" },
   }[jenis];
   return <span className={cn("rounded-full px-2 py-0.5 text-[0.65rem] font-semibold tracking-wide uppercase", map.c)}>{map.t}</span>;
 }
 
-function Baris({ label, sumber, nilai, detail }: { label: string; sumber: "input" | "hitung"; nilai: ReactNode; detail?: ReactNode }) {
+function Angka({ label, nilai, detail }: { label: string; nilai: string; detail: string }) {
   return (
-    <div className="py-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-ink-600">{label}</p>
-        <Sumber jenis={sumber} />
-      </div>
+    <div className="min-w-0">
+      <p className="text-xs text-ink-500">{label}</p>
       <p className="num mt-1 text-xl font-semibold text-ink-950">{nilai}</p>
-      {detail && <p className="mt-0.5 text-xs text-ink-500">{detail}</p>}
+      <p className="mt-0.5 truncate text-xs text-ink-500" title={detail}>
+        {detail}
+      </p>
     </div>
   );
 }
@@ -333,22 +336,20 @@ function RingkasanEnergi({
   jumlahRumah?: number;
 }) {
   const r = hasil.ringkasan;
-  const p = hasil.parameter;
   const b = hasil.biaya;
   const gagal = hasil.pemeriksaan.filter((x) => !x.lulus);
   return (
     <Card className="h-full">
       <SectionTitle
-        title="Ringkasan energi desa"
+        title={
+          <span className="flex items-center gap-2">
+            Energi desa <Sumber jenis="hitung" />
+          </span>
+        }
         hint={
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <Link href={`/perencana/${id}`} className="font-medium text-ink-700 hover:underline">
-              {judul}
-            </Link>
-            {ilustrasi && <IlustrasiTag />}
-            <span>
-              · dihitung {tanggal(waktu)} · konfigurasi v{versi}
-            </span>
+          <span className="flex flex-wrap items-center gap-x-1.5">
+            {judul} {ilustrasi && <IlustrasiTag />} · {tanggal(waktu)}
+            {versi !== versiAktif && <span className="text-amber-600">· parameter v{versi} (aktif v{versiAktif})</span>}
           </span>
         }
         action={
@@ -358,76 +359,50 @@ function RingkasanEnergi({
         }
       />
 
-      {versi !== versiAktif && (
-        <Notice tone="info" className="mb-3">
-          Rencana ini dihitung dengan konfigurasi v{versi}, sedangkan konfigurasi aktif v{versiAktif}. Hasil lama tidak diubah otomatis; buat
-          ulang rencana bila ingin memakai parameter terbaru.
-        </Notice>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+        <Angka
+          label="Kebutuhan harian"
+          nilai={`${num(r.kebutuhan_harian_kwh)} kWh`}
+          detail={jumlahRumah ? `${num(jumlahRumah, 0)} rumah · malam ${num(r.kebutuhan_malam_kwh)} kWh` : `malam ${num(r.kebutuhan_malam_kwh)} kWh`}
+        />
+        <Angka
+          label="Panel surya"
+          nilai={`${num(r.kapasitas_panel_terpasang_kwp)} kWp`}
+          detail={r.produksi_surya_harian_kwh !== undefined ? `${r.jumlah_panel} panel · ±${num(r.produksi_surya_harian_kwh)} kWh/hari` : `${r.jumlah_panel} panel`}
+        />
+        <Angka label="Baterai dapat dipakai" nilai={`${num(r.energi_tersedia_kwh)} kWh`} detail={`${r.jumlah_paket} paket · nominal ${num(r.kapasitas_baterai_total_kwh)} kWh`} />
+        <Angka label="Inverter" nilai={`${num(r.inverter_kw, 0)} kW`} detail={`puncak ${num(r.daya_puncak_kw)} kW`} />
+      </div>
+
+      <dl className="mt-5 grid gap-x-6 gap-y-2 border-t border-ink-100 pt-4 text-sm sm:grid-cols-3">
+        <div>
+          <dt className="text-xs text-ink-500">Sistem / rumah · {b.periode_hari} hari</dt>
+          <dd className="num font-semibold text-ink-900">{rentang(b.sistem_per_rumah)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-ink-500">Setara diesel / rumah · {b.periode_hari} hari</dt>
+          <dd className="num font-semibold text-sun-700">{rentang(b.diesel_per_rumah)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-ink-500">Iuran perawatan / rumah</dt>
+          <dd className="num font-semibold text-ink-900">{rentang(b.iuran_perawatan_per_rumah_bulan)}/bln</dd>
+        </div>
+      </dl>
+
+      {gagal.length > 0 ? (
+        <ul className="mt-4 space-y-1 text-sm text-flame-600">
+          {gagal.map((x) => (
+            <li key={x.nama} className="flex items-start gap-2">
+              <XCircle className="mt-0.5 size-4 shrink-0" /> {x.keterangan}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-4 flex items-center gap-2 text-sm text-leaf-700">
+          <CheckCircle2 className="size-4" /> Kebutuhan energi dan daya puncak terpenuhi.
+        </p>
       )}
-
-      <div className="grid gap-x-8 divide-y divide-ink-100 sm:grid-cols-2 sm:divide-y-0">
-        <div className="divide-y divide-ink-100">
-          <Baris
-            label="Kebutuhan energi harian"
-            sumber="hitung"
-            nilai={`${num(r.kebutuhan_harian_kwh)} kWh/hari`}
-            detail={jumlahRumah ? `${num(jumlahRumah, 0)} rumah (input) × konsumsi per rumah` : undefined}
-          />
-          <Baris
-            label="Kebutuhan malam dari baterai"
-            sumber="hitung"
-            nilai={`${num(r.kebutuhan_malam_kwh)} kWh/hari`}
-            detail={`Sudah termasuk rugi konversi (efisiensi ${num(p.efisiensi * 100, 0)}%)`}
-          />
-          <Baris
-            label="Panel surya"
-            sumber="hitung"
-            nilai={`${r.jumlah_panel} panel · ${num(r.kapasitas_panel_terpasang_kwp)} kWp`}
-            detail={
-              r.produksi_surya_harian_kwh !== undefined
-                ? `Estimasi produksi ${num(r.produksi_surya_harian_kwh)} kWh/hari (PSH ${num(p.psh_jam)} jam × PR ${num(p.pr * 100, 0)}%)`
-                : `PSH ${num(p.psh_jam)} jam × PR ${num(p.pr * 100, 0)}%`
-            }
-          />
-        </div>
-        <div className="divide-y divide-ink-100">
-          <Baris
-            label="Baterai"
-            sumber="hitung"
-            nilai={`${num(r.energi_tersedia_kwh)} kWh dapat dipakai`}
-            detail={`${r.jumlah_paket} paket · kapasitas nominal ${num(r.kapasitas_baterai_total_kwh)} kWh × SoH ${num(p.soh_paket * 100, 0)}% × batas pengosongan ${num(p.dod * 100, 0)}%`}
-          />
-          <Baris label="Inverter" sumber="hitung" nilai={`${num(r.inverter_kw, 0)} kW`} detail={`Daya puncak ${num(r.daya_puncak_kw)} kW`} />
-          <Baris
-            label="Iuran perawatan per rumah"
-            sumber="hitung"
-            nilai={`${rentang(b.iuran_perawatan_per_rumah_bulan)}/bulan`}
-            detail="Rentang biaya rendah–tinggi dari konfigurasi"
-          />
-        </div>
-      </div>
-
-      <div className="mt-2 grid gap-3 border-t border-ink-100 pt-4 sm:grid-cols-2">
-        <div className="rounded-2xl bg-canvas p-4 ring-1 ring-ink-200/60">
-          <p className="text-xs text-ink-500">Biaya sistem per rumah · {b.periode_hari} hari</p>
-          <p className="num mt-1 text-lg font-semibold text-ink-950">{rentang(b.sistem_per_rumah)}</p>
-        </div>
-        <div className="rounded-2xl bg-canvas p-4 ring-1 ring-ink-200/60">
-          <p className="text-xs text-ink-500">Setara biaya diesel per rumah · {b.periode_hari} hari</p>
-          <p className="num mt-1 text-lg font-semibold text-sun-700">{rentang(b.diesel_per_rumah)}</p>
-        </div>
-      </div>
-
-      <ul className="mt-4 space-y-1.5 text-sm">
-        {hasil.pemeriksaan.map((x) => (
-          <li key={x.nama} className="flex items-start gap-2">
-            {x.lulus ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-leaf-600" /> : <XCircle className="mt-0.5 size-4 shrink-0 text-flame-600" />}
-            <span className={cn(x.lulus ? "text-ink-600" : "font-medium text-flame-600")}>{x.keterangan}</span>
-          </li>
-        ))}
-      </ul>
-      {gagal.length > 0 && <p className="mt-2 text-xs text-flame-600">Ada kebutuhan yang belum terpenuhi. Sesuaikan rencana sebelum dipasang.</p>}
-      <p className="mt-4 text-xs text-ink-500">Angka di atas adalah hasil perencanaan, bukan pembacaan meter. SOLUNA belum menerima data pengukuran langsung.</p>
+      <p className="mt-2 text-xs text-ink-500">Hasil perencanaan, bukan pembacaan meter.</p>
     </Card>
   );
 }
@@ -438,15 +413,14 @@ function Ketahanan({ simulasi, rencanaId }: { simulasi: { hasil: unknown; create
   const href = rencanaId ? `/ketahanan?rencana=${rencanaId}` : "/ketahanan";
   if (!simulasi) {
     return (
-      <Card className="h-full">
+      <Card className="flex h-full flex-col">
         <SectionTitle title="Ketahanan energi" />
-        <EmptyState
-          icon={<CloudRain className="size-5" />}
-          title="Belum ada simulasi"
-          description={rencanaId ? "Uji berapa lama rencana terakhir bertahan saat mendung atau hujan beberapa hari." : "Buat rencana desa, lalu jalankan simulasi ketahanan."}
-          action={<ButtonLink href={href}>Jalankan simulasi</ButtonLink>}
-          className="py-10"
-        />
+        <div className="flex flex-1 flex-col items-start justify-center gap-3">
+          <p className="text-sm text-ink-600">{rencanaId ? "Belum ada simulasi untuk rencana terakhir." : "Buat rencana desa dulu, lalu jalankan simulasi."}</p>
+          <ButtonLink href={href} variant="secondary" size="sm">
+            <CloudRain className="size-4" /> Jalankan simulasi
+          </ButtonLink>
+        </div>
       </Card>
     );
   }
@@ -455,43 +429,34 @@ function Ketahanan({ simulasi, rencanaId }: { simulasi: { hasil: unknown; create
   return (
     <Card className="h-full">
       <SectionTitle
-        title="Ketahanan energi"
-        hint={
-          <span className="flex flex-wrap items-center gap-2">
-            <Sumber jenis="simulasi" /> {tanggal(simulasi.createdAt)}
+        title={
+          <span className="flex items-center gap-2">
+            Ketahanan <Sumber jenis="simulasi" />
           </span>
         }
+        hint={`${tanggal(simulasi.createdAt)} · target ${periode} hari`}
         action={
           <Link href={href} className="text-sm font-semibold whitespace-nowrap text-sun-700 hover:underline">
             Buka
           </Link>
         }
       />
-      <p className="text-sm text-ink-600">
-        Baterai penuh di awal, {h.prioritas_label.toLowerCase()} (batas pengosongan {num(h.dod_efektif * 100, 0)}%), energi tersedia{" "}
-        <span className="num font-medium text-ink-900">{num(h.energi_tersedia_kwh)} kWh</span>. Target {periode} hari.
-      </p>
-      <ul className="mt-4 space-y-4">
+      <ul className="space-y-3.5">
         {h.skenario.map((s) => {
           const lama = s.lama_bertahan_pelepasan_hari;
           return (
             <li key={s.kunci}>
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-sm font-medium text-ink-800">{s.label}</span>
-                <span className="num text-sm font-semibold text-ink-950">{days(lama)}</span>
+              <div className="flex items-baseline justify-between gap-2 text-sm">
+                <span className="text-ink-700">{s.label}</span>
+                <span className="num font-semibold text-ink-950">{days(lama)}</span>
               </div>
               <Progress value={lama === null ? periode : Math.min(lama, periode)} max={periode} color={s.cukup_pelepasan ? "bg-leaf-500" : "bg-sun-500"} className="mt-1.5" />
-              <p className="mt-1 text-xs text-ink-500">
-                Tanpa pelepasan beban {days(s.lama_bertahan_hari)} ·{" "}
-                {s.cukup_pelepasan ? "genset tidak diperlukan" : `genset sekitar ${num(s.jam_genset_pelepasan, 1)} jam`}
-              </p>
+              {!s.cukup_pelepasan && <p className="mt-1 text-xs text-ink-500">Genset ±{num(s.jam_genset_pelepasan, 1)} jam</p>}
             </li>
           );
         })}
       </ul>
-      <p className="mt-4 text-xs text-ink-500">
-        Lama bertahan memakai pelepasan beban bertingkat: Kenyamanan dilepas lebih dulu, lalu Penting. Ini simulasi, bukan kondisi perangkat nyata.
-      </p>
+      <p className="mt-4 text-xs text-ink-500">Dengan pelepasan beban bertingkat · {h.prioritas_label}</p>
     </Card>
   );
 }
@@ -514,5 +479,5 @@ async function aktivitasTerbaru() {
     ...simulasi.map((s) => ({ id: `s-${s.id}`, waktu: s.createdAt, judul: "Simulasi ketahanan dijalankan", detail: s.nama, href: s.rencanaId ? `/ketahanan?rencana=${s.rencanaId}` : "/ketahanan", icon: CloudRain, tone: "bg-sky-50 text-sky-600" })),
     ...kompat.map((k) => ({ id: `k-${k.id}`, waktu: k.createdAt, judul: `Pemeriksaan kompatibilitas${k.baterai ? `: ${k.baterai.kode}` : ""}`, detail: (k.hasil as unknown as HasilKompatibilitas).label, href: "/riwayat?jenis=kompatibilitas", icon: PlugZap, tone: "bg-amber-50 text-amber-600" })),
   ];
-  return items.sort((a, b) => b.waktu.getTime() - a.waktu.getTime()).slice(0, 8);
+  return items.sort((a, b) => b.waktu.getTime() - a.waktu.getTime()).slice(0, MAKS);
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Badge, Card, PageHeader, SectionTitle } from "@/components/ui";
+import { Paginasi, bacaHalaman } from "@/components/paginasi";
 import { requireAdmin } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
 import { tanggal } from "@/lib/format";
@@ -16,16 +17,19 @@ export default async function KompatibilitasPage({ searchParams }: PageProps<"/k
   const sp = await searchParams;
   const bateraiId = typeof sp.baterai === "string" ? sp.baterai : "";
   const rencanaId = typeof sp.rencana === "string" ? sp.rencana : "";
-  const [{ data: cfg }, baterai, rencana, riwayat] = await Promise.all([
+  const [{ data: cfg }, baterai, rencana, totalRiwayat] = await Promise.all([
     getActiveConfig(),
     bateraiId ? prisma.baterai.findUnique({ where: { id: bateraiId } }) : null,
     rencanaId ? prisma.rencanaDesa.findUnique({ where: { id: rencanaId } }) : null,
-    prisma.cekKompatibilitas.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      include: { baterai: { select: { kode: true } }, rencana: { select: { namaDesa: true } } },
-    }),
+    prisma.cekKompatibilitas.count(),
   ]);
+  const halRiwayat = bacaHalaman(sp, totalRiwayat);
+  const riwayat = await prisma.cekKompatibilitas.findMany({
+    orderBy: { createdAt: "desc" },
+    skip: halRiwayat.skip,
+    take: halRiwayat.take,
+    include: { baterai: { select: { kode: true } }, rencana: { select: { namaDesa: true } } },
+  });
   const h = rencana?.hasil as HasilRencana | undefined;
 
   const initial: Record<string, string> = {
@@ -59,7 +63,7 @@ export default async function KompatibilitasPage({ searchParams }: PageProps<"/k
   return (
     <>
       <PageHeader
-        eyebrow="Modul C · Kompatibilitas & keselamatan"
+        eyebrow="Perencanaan"
         title="Cek kompatibilitas"
         description="Cocokkan tegangan baterai dengan spesifikasi inverter sebelum pemasangan. Hasil: layak, perlu penyesuaian, atau tidak layak — selalu dengan alasan."
       />
@@ -67,7 +71,7 @@ export default async function KompatibilitasPage({ searchParams }: PageProps<"/k
         <CompatForm initial={initial} konteks={konteks} key={`${bateraiId}-${rencanaId}`} />
         <aside>
           <Card>
-            <SectionTitle title="Pemeriksaan terakhir" />
+            <SectionTitle title="Riwayat pemeriksaan" />
             {riwayat.length ? (
               <ul className="space-y-3">
                 {riwayat.map((r) => {
@@ -85,6 +89,9 @@ export default async function KompatibilitasPage({ searchParams }: PageProps<"/k
               </ul>
             ) : (
               <p className="text-sm text-ink-500">Belum ada pemeriksaan.</p>
+            )}
+            {riwayat.length > 0 && (
+              <Paginasi basePath="/kompatibilitas" sp={sp} halaman={halRiwayat.halaman} total={totalRiwayat} tampil={riwayat.length} satuan="pemeriksaan" ringkas className="border-t border-ink-100 pt-3" />
             )}
           </Card>
         </aside>

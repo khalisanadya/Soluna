@@ -8,7 +8,7 @@ import { buttonClass } from "./ui";
 import { cn } from "@/lib/format";
 import { SAMBUTAN_COOKIE } from "@/lib/flash";
 
-const dialogClass =
+export const dialogClass =
   "m-auto w-[calc(100%-2rem)] max-w-sm rounded-[1.75rem] bg-surface p-0 text-ink-900 shadow-lift ring-1 ring-ink-200/70 backdrop:bg-ink-950/45 backdrop:backdrop-blur-[2px] open:animate-rise";
 
 /* ---------- Konfirmasi keluar ---------- */

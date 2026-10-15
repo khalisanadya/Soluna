@@ -218,6 +218,25 @@ export function Stat({
   );
 }
 
+/** Tingkat SoH. Ambang mengikuti batas grade di konfigurasi: ≥ grade A tinggi, < grade C rendah. */
+export function tingkatSoh(soh: number, tinggi = 80, rendah = 60) {
+  if (soh >= tinggi) return { label: "Tinggi", dot: "bg-leaf-500", cls: "bg-leaf-50 text-leaf-700 ring-leaf-100" };
+  if (soh >= rendah) return { label: "Sedang", dot: "bg-amber-500", cls: "bg-amber-50 text-amber-600 ring-amber-100" };
+  return { label: "Rendah", dot: "bg-flame-500", cls: "bg-flame-50 text-flame-600 ring-flame-100" };
+}
+
+export function SohBadge({ soh, tinggi, rendah }: { soh: number | null | undefined; tinggi?: number; rendah?: number }) {
+  if (soh === null || soh === undefined) return <span className="text-ink-400">—</span>;
+  const t = tingkatSoh(soh, tinggi, rendah);
+  return (
+    <span className={cn("num inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-sm font-medium ring-1", t.cls)} title={`SoH ${t.label.toLowerCase()}`}>
+      <span className={cn("size-1.5 rounded-full", t.dot)} aria-hidden="true" />
+      {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(soh)}%
+      <span className="sr-only">({t.label})</span>
+    </span>
+  );
+}
+
 /* ---------- Formulir ---------- */
 
 export const inputClass =

@@ -31,6 +31,9 @@ class PlanInput(BaseModel):
     kapasitas_per_panel_wp: float | None = Field(default=None, gt=0)
     paket: PaketInput = PaketInput()
     periode_hari: int = Field(default=30, gt=0, le=366)
+    # Biaya diesel di desa (laporan Modul B: masukan perencana). Kosong = rentang dari konfigurasi.
+    harga_diesel_rendah: float | None = Field(default=None, gt=0)
+    harga_diesel_tinggi: float | None = Field(default=None, gt=0)
 
 
 def ukuran_paket(e_malam: float, kap: float, soh: float, dod: float, hari_cadangan: int) -> tuple[float, int, int]:
@@ -134,7 +137,13 @@ def plan(data: PlanInput, cfg: dict[str, Any]) -> dict[str, Any]:
     ]
 
     # P-8, P-9: diesel dan CO2 per periode.
-    d = cfg["diesel"]
+    d = dict(cfg["diesel"])
+    if data.harga_diesel_rendah is not None:
+        d["harga_per_liter_rendah"] = data.harga_diesel_rendah
+    if data.harga_diesel_tinggi is not None:
+        d["harga_per_liter_tinggi"] = data.harga_diesel_tinggi
+    if d["harga_per_liter_rendah"] > d["harga_per_liter_tinggi"]:
+        d["harga_per_liter_rendah"], d["harga_per_liter_tinggi"] = d["harga_per_liter_tinggi"], d["harga_per_liter_rendah"]
     energi_periode = e_harian * data.periode_hari
     liter = energi_periode / d["kwh_per_liter"]
     co2_kg = liter * d["faktor_emisi_kg_per_liter"]
@@ -202,6 +211,7 @@ def plan(data: PlanInput, cfg: dict[str, Any]) -> dict[str, Any]:
             "kapasitas_per_panel_wp": wp_panel, "kapasitas_paket_kwh": kap, "soh_paket": soh,
             "periode_hari": data.periode_hari, "nama_paket": data.paket.nama or cfg["profil_paket"]["nama"],
             "sumber_paket": data.paket.sumber,
+            "harga_diesel_rendah": d["harga_per_liter_rendah"], "harga_diesel_tinggi": d["harga_per_liter_tinggi"],
         },
         "pemeriksaan": pemeriksaan,
         "lingkungan": {"diesel_hemat_liter": r(liter), "co2_dihindari_kg": r(co2_kg), "periode_hari": data.periode_hari},

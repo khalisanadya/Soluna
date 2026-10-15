@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CheckCircle2, CircleX, FlaskConical } from "lucide-react";
 import { activateConfig, resetConfig } from "@/app/actions/konfigurasi";
 import { Badge, Card, Notice, PageHeader, SectionTitle, buttonClass } from "@/components/ui";
+import { Paginasi, bacaHalaman } from "@/components/paginasi";
 import { requireAdmin } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
 import { CONFIG_FIELDS, getPath } from "@/lib/config-fields";
@@ -13,12 +14,12 @@ import { ConfigForm } from "./config-form";
 
 export const metadata: Metadata = { title: "Pengaturan" };
 
-export default async function PengaturanPage() {
+export default async function PengaturanPage({ searchParams }: PageProps<"/pengaturan">) {
   await requireAdmin();
-  const [{ versi, data }, versions] = await Promise.all([
-    getActiveConfig(),
-    prisma.konfigurasi.findMany({ orderBy: { versi: "desc" }, take: 15, include: { dibuatOleh: { select: { nama: true } } } }),
-  ]);
+  const sp = await searchParams;
+  const [{ versi, data }, totalVersi] = await Promise.all([getActiveConfig(), prisma.konfigurasi.count()]);
+  const hal = bacaHalaman(sp, totalVersi);
+  const versions = await prisma.konfigurasi.findMany({ orderBy: { versi: "desc" }, skip: hal.skip, take: hal.take, include: { dibuatOleh: { select: { nama: true } } } });
   const values: Record<string, string> = {};
   for (const f of CONFIG_FIELDS) {
     const v = getPath(data, f.path);
@@ -28,7 +29,7 @@ export default async function PengaturanPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Lainnya"
+        eyebrow="Pengaturan"
         title="Pengaturan"
         description="Parameter hitung disimpan terpisah dari logika hitung dan berversi. Setiap hasil mencatat versi konfigurasi yang dipakai."
       />
@@ -60,6 +61,7 @@ export default async function PengaturanPage() {
                 </li>
               ))}
             </ul>
+            <Paginasi basePath="/pengaturan" sp={sp} halaman={hal.halaman} total={totalVersi} tampil={versions.length} satuan="versi" ringkas className="border-t border-ink-100 pt-3" />
             <form action={resetConfig} className="mt-3">
               <button className={buttonClass("ghost", "sm")}>Kembalikan ke nilai bawaan</button>
             </form>

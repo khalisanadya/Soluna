@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, CheckCircle2, Recycle, Timer } from "lucide-react";
 import { TrendLine } from "@/components/charts";
+import { Paginasi, potong } from "@/components/paginasi";
 import { Badge, Card, Disclaimer, EmptyState, GradeBadge, Notice, PageHeader, SectionTitle, Stat, buttonClass } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
@@ -29,6 +30,9 @@ export default async function SiklusHidupPage({ searchParams }: PageProps<"/sikl
   const selectedId = typeof sp.baterai === "string" && byId.has(sp.baterai) ? sp.baterai : baterai[0]?.id;
   const selected = selectedId ? byId.get(selectedId) : undefined;
   const ambang = cfg.siklus_hidup.ambang_penggantian_soh;
+  const jadwal = potong(res.ok ? res.data.baterai : [], sp);
+  const bacaanTerbaru = selected ? [...selected.bacaanSoh].reverse() : [];
+  const bacaanHal = potong(bacaanTerbaru, sp);
 
   return (
     <>
@@ -78,7 +82,7 @@ export default async function SiklusHidupPage({ searchParams }: PageProps<"/sikl
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ink-100">
-                    {res.data.baterai.map((r) => {
+                    {jadwal.rows.map((r) => {
                       const b = byId.get(r.id)!;
                       return (
                         <tr key={r.id}>
@@ -105,6 +109,7 @@ export default async function SiklusHidupPage({ searchParams }: PageProps<"/sikl
                     })}
                   </tbody>
                 </table>
+                <Paginasi basePath="/siklus-hidup" sp={sp} halaman={jadwal.halaman} total={res.data.baterai.length} tampil={jadwal.rows.length} satuan="baterai" className="border-t border-ink-100 pt-3" />
               </Card>
               <div className="space-y-4">
                 <Card>
@@ -174,7 +179,7 @@ export default async function SiklusHidupPage({ searchParams }: PageProps<"/sikl
                   <>
                     <TrendLine points={selected.bacaanSoh.map((r) => ({ x: r.tanggal.toISOString(), y: r.soh }))} threshold={ambang} warn={ambang + cfg.siklus_hidup.margin_peringatan_soh} height={220} />
                     <ul className="mt-4 divide-y divide-ink-100 text-sm">
-                      {[...selected.bacaanSoh].reverse().map((r) => (
+                      {bacaanHal.rows.map((r) => (
                         <li key={r.id} className="flex items-center justify-between py-2">
                           <span className="flex items-center gap-2">
                             <CalendarClock className="size-4 text-ink-400" /> {tanggal(r.tanggal)}
@@ -184,6 +189,7 @@ export default async function SiklusHidupPage({ searchParams }: PageProps<"/sikl
                         </li>
                       ))}
                     </ul>
+                    <Paginasi basePath="/siklus-hidup" sp={sp} halaman={bacaanHal.halaman} total={bacaanTerbaru.length} tampil={bacaanHal.rows.length} satuan="pembacaan" />
                   </>
                 ) : (
                   <EmptyState title="Belum ada pembacaan" className="py-8" />

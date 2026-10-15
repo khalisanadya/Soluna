@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { Building2, Mail, MapPin, Phone, Search } from "lucide-react";
-import { Badge, Card, EmptyState, PageHeader, buttonClass, inputClass } from "@/components/ui";
+import { Suspense } from "react";
+import { Building2, Mail, MapPin, Phone } from "lucide-react";
+import { Paginasi, bacaHalaman } from "@/components/paginasi";
+import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { JENIS_KIMIA, PROVINSI } from "@/lib/wilayah";
+import { PemasokFilter } from "./filter-form";
 
 export const metadata: Metadata = { title: "Pemasok" };
 
@@ -23,47 +26,28 @@ export default async function PemasokPage({ searchParams }: PageProps<"/pemasok"
   if (kimia) and.push({ OR: [{ jenisBaterai: { contains: kimia, mode: "insensitive" } }, { baterai: { some: { jenisKimia: kimia } } }] });
   const where: Prisma.PemasokWhereInput = { AND: and };
 
+  const total = await prisma.pemasok.count({ where });
+  const { halaman, skip, take } = bacaHalaman(sp, total);
   const rows = await prisma.pemasok.findMany({
     where,
     orderBy: { namaPerusahaan: "asc" },
+    skip,
+    take,
     include: { _count: { select: { baterai: true } }, baterai: { select: { status: true, jenisKimia: true } } },
   });
   const filtered = Boolean(q || provinsi || kimia);
 
   return (
     <>
-      <PageHeader eyebrow="Aset" title="Pemasok baterai" description="Operator armada, bengkel, dan produsen yang menyalurkan baterai pensiun kendaraan listrik." />
-      <form className="mb-4 grid gap-2 rounded-[var(--radius-card)] bg-surface p-3 shadow-soft ring-1 ring-ink-200/60 sm:grid-cols-2 lg:flex" role="search">
-        <label className="relative lg:flex-1">
-          <span className="sr-only">Cari pemasok</span>
-          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-400" />
-          <input name="q" defaultValue={q} placeholder="Cari perusahaan, penanggung jawab, kota…" className={`${inputClass} pl-10`} />
-        </label>
-        <select name="provinsi" defaultValue={provinsi} className={`${inputClass} lg:w-56`} aria-label="Provinsi">
-          <option value="">Semua wilayah</option>
-          {PROVINSI.map((p) => (
-            <option key={p}>{p}</option>
-          ))}
-        </select>
-        <select name="kimia" defaultValue={kimia} className={`${inputClass} lg:w-40`} aria-label="Jenis baterai">
-          <option value="">Semua jenis</option>
-          {JENIS_KIMIA.map((k) => (
-            <option key={k}>{k}</option>
-          ))}
-        </select>
-        <div className="flex gap-2">
-          <button className={buttonClass("dark", "md", "flex-1 lg:flex-none")}>Terapkan</button>
-          {filtered && (
-            <Link href="/pemasok" className={buttonClass("ghost")}>
-              Reset
-            </Link>
-          )}
-        </div>
-      </form>
+      <PageHeader eyebrow="Baterai" title="Pemasok baterai" description="Operator armada, bengkel, dan produsen yang menyalurkan baterai pensiun kendaraan listrik." />
+      <Suspense fallback={<div className="mb-4 h-[9.75rem] rounded-[var(--radius-card)] bg-surface ring-1 ring-ink-200/60" />}>
+        <PemasokFilter provinsi={PROVINSI} kimia={JENIS_KIMIA} />
+      </Suspense>
 
       {rows.length === 0 ? (
         <EmptyState icon={<Building2 className="size-5" />} title={filtered ? "Tidak ada pemasok yang cocok" : "Belum ada pemasok"} description={filtered ? "Ubah kata kunci atau filter." : "Pemasok dapat mendaftar sendiri melalui halaman Daftar."} />
       ) : (
+        <>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((p) => {
             const dinilai = p.baterai.filter((b) => b.status === "DINILAI").length;
@@ -106,6 +90,8 @@ export default async function PemasokPage({ searchParams }: PageProps<"/pemasok"
             );
           })}
         </div>
+        <Paginasi basePath="/pemasok" sp={sp} halaman={halaman} total={total} tampil={rows.length} satuan="pemasok" />
+        </>
       )}
     </>
   );

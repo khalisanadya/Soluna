@@ -274,7 +274,7 @@ export function Simulator({
               </select>
             </Field>
             {baterai.length > 0 && (
-              <Field label="Pakai SoH baterai dari Modul A" htmlFor="sim-bat" className="sm:col-span-3 lg:col-span-6">
+              <Field label="Pakai SoH baterai hasil penilaian" htmlFor="sim-bat" className="sm:col-span-3 lg:col-span-6">
                 <select
                   id="sim-bat"
                   defaultValue=""
