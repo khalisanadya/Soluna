@@ -1,19 +1,19 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { BatteryCharging, ClipboardCheck, CloudSun, Fuel, Pencil, Sun, Wallet } from "lucide-react";
+import { BatteryCharging, ClipboardCheck, CloudSun, Pencil, Sun, Wallet } from "lucide-react";
 import { saveConfig } from "@/app/actions/konfigurasi";
 import { SubmitButton } from "@/components/submit-button";
 import { Button, Card, Field, Notice, inputClass } from "@/components/ui";
 import { CONFIG_FIELDS, CONFIG_GROUPS, PSH_PREFIX, type ConfigField, type GroupKey } from "@/lib/config-fields";
 import { cn, num } from "@/lib/format";
+import { useUnsavedGuard } from "@/components/unsaved-guard";
 
 const ICON: Record<GroupKey, React.ReactNode> = {
   penilaian: <ClipboardCheck className="size-4" />,
   surya: <Sun className="size-4" />,
   baterai: <BatteryCharging className="size-4" />,
   biaya: <Wallet className="size-4" />,
-  genset: <Fuel className="size-4" />,
   cuaca: <CloudSun className="size-4" />,
 };
 
@@ -29,7 +29,6 @@ export function ConfigForm({ values, lokasi, versi }: { values: Record<string, s
   const [state, action] = useActionState(saveConfig, undefined);
   const [edit, setEdit] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [konfirmasi, setKonfirmasi] = useState(false);
   const [putaran, setPutaran] = useState(0); // ganti key → isian kembali ke nilai tersimpan
   const [porsi, setPorsi] = useState(() => ({ k: values.porsi_kritis, p: values.porsi_penting, n: values.porsi_nyaman }));
   const e = state?.errors ?? {};
@@ -46,7 +45,6 @@ export function ConfigForm({ values, lokasi, versi }: { values: Record<string, s
   const batal = () => {
     setEdit(false);
     setDirty(false);
-    setKonfirmasi(false);
     setPutaran((x) => x + 1);
     setPorsi({ k: values.porsi_kritis, p: values.porsi_penting, n: values.porsi_nyaman });
   };
@@ -89,7 +87,7 @@ export function ConfigForm({ values, lokasi, versi }: { values: Record<string, s
       {!edit && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-sm text-ink-600">
-            <span className="size-2 rounded-full bg-leaf-500" /> Versi <span className="font-semibold text-ink-900">v{versi}</span> sedang dipakai
+            <span className="size-2 rounded-full bg-leaf-500" /> Nilai yang sedang dipakai semua perhitungan
           </p>
           <Button type="button" onClick={() => setEdit(true)}>
             <Pencil className="size-4" /> Ubah parameter
@@ -144,36 +142,28 @@ export function ConfigForm({ values, lokasi, versi }: { values: Record<string, s
         </Card>
       ))}
 
-      {/* Bar simpan: hanya saat mengubah */}
-      {edit && (
-        <div className="sticky bottom-20 z-20 md:bottom-4">
-          <div className="flex flex-col gap-3 rounded-2xl bg-ink-900 p-3 text-white shadow-lift sm:flex-row sm:items-center">
-            {konfirmasi ? (
-              <>
-                <span className="flex-1 px-1 text-sm">Buang perubahan yang belum disimpan?</span>
-                <button type="button" onClick={() => setKonfirmasi(false)} className="h-10 rounded-full px-4 text-sm font-semibold text-ink-200 hover:bg-white/10">
-                  Lanjut mengubah
-                </button>
-                <button type="button" onClick={batal} className="h-10 rounded-full bg-flame-500 px-4 text-sm font-semibold text-white hover:bg-flame-600">
-                  Ya, buang
-                </button>
-              </>
-            ) : (
-              <>
-                <span className={cn("flex items-center gap-2 px-1 text-xs", dirty ? "text-sun-300" : "text-ink-400")}>
-                  <span className={cn("size-2 rounded-full", dirty ? "bg-sun-400" : "bg-ink-500")} />
-                  {dirty ? "Ada perubahan" : "Mode ubah"}
-                </span>
-                <input name="catatan" placeholder="Catatan perubahan (opsional)" className="h-10 min-w-0 flex-1 rounded-xl bg-white/10 px-3 text-sm text-white placeholder:text-ink-400 focus:ring-2 focus:ring-sun-400 focus:outline-none" />
-                <button type="button" onClick={() => (dirty ? setKonfirmasi(true) : batal())} className="h-10 rounded-full px-4 text-sm font-semibold text-ink-200 hover:bg-white/10">
-                  Batal
-                </button>
-                <SubmitButton pendingText="Menyimpan…">Simpan sebagai v{versi + 1}</SubmitButton>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Bar simpan: hanya saat mengubah (dengan konfirmasi saat keluar) */}
+      {edit && <BarSimpan dirty={dirty} onBatal={batal} />}
     </form>
+  );
+}
+
+/** Bar simpan mode ubah. Dipasang hanya saat mengubah, sehingga konfirmasi keluar hanya aktif di mode ini. */
+function BarSimpan({ dirty, onBatal }: { dirty: boolean; onBatal: () => void }) {
+  const { leave, dialog } = useUnsavedGuard(dirty);
+  return (
+    <div className="sticky bottom-20 z-20 md:bottom-4">
+      <div className="flex flex-col gap-3 rounded-2xl bg-ink-900 p-3 text-white shadow-lift sm:flex-row sm:items-center">
+        <span className={cn("flex flex-1 items-center gap-2 px-1 text-xs", dirty ? "text-sun-300" : "text-ink-400")}>
+          <span className={cn("size-2 rounded-full", dirty ? "bg-sun-400" : "bg-ink-500")} />
+          {dirty ? "Ada perubahan yang belum disimpan" : "Mode ubah"}
+        </span>
+        <button type="button" onClick={() => leave(onBatal)} className="h-10 rounded-full px-4 text-sm font-semibold text-ink-200 hover:bg-white/10">
+          Batal
+        </button>
+        <SubmitButton pendingText="Menyimpan…">Simpan perubahan</SubmitButton>
+      </div>
+      {dialog}
+    </div>
   );
 }

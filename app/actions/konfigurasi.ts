@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
-import { getActiveConfig, readDefaultConfig } from "@/lib/config";
-import { formNumber, formString } from "@/lib/format";
+import { getActiveConfig } from "@/lib/config";
+import { formNumber } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { CONFIG_FIELDS as FIELDS, PSH_PREFIX } from "@/lib/config-fields";
 import type { FormState } from "@/lib/validation";
@@ -57,7 +57,7 @@ export async function saveConfig(_prev: FormState, fd: FormData): Promise<FormSt
   const n = (name: string) => angka(name) ?? NaN;
   if (!(n("grade_A") > n("grade_B") && n("grade_B") > n("grade_C"))) errors.grade_B = ["Harus menurun: A > B > C."];
   if (n("ambang_ganti") > n("grade_C")) errors.ambang_ganti = ["Tidak boleh di atas batas grade C."];
-  for (const [lo, hi] of [["harga_bat_rendah", "harga_bat_tinggi"], ["harga_panel_rendah", "harga_panel_tinggi"], ["diesel_rendah", "diesel_tinggi"]]) {
+  for (const [lo, hi] of [["harga_bat_rendah", "harga_bat_tinggi"], ["harga_panel_rendah", "harga_panel_tinggi"]]) {
     if (n(lo) > n(hi)) errors[hi] = ["Tidak boleh lebih kecil dari harga terendah."];
   }
   if (Math.abs(n("porsi_kritis") + n("porsi_penting") + n("porsi_nyaman") - 100) > 0.5) errors.porsi_nyaman = ["Jumlah ketiga porsi harus 100%."];
@@ -77,34 +77,13 @@ export async function saveConfig(_prev: FormState, fd: FormData): Promise<FormSt
     return { message: "Mesin hitung tidak dapat dihubungi; konfigurasi belum disimpan." };
   }
 
-  const last = await prisma.konfigurasi.findFirst({ orderBy: { versi: "desc" } });
-  const versi = (last?.versi ?? 0) + 1;
-  await prisma.$transaction([
-    prisma.konfigurasi.updateMany({ where: { aktif: true }, data: { aktif: false } }),
-    prisma.konfigurasi.create({ data: { versi, data: data as object, aktif: true, catatan: formString(fd, "catatan") || null, dibuatId: user.id } }),
-  ]);
+  // Tanpa riwayat versi: konfigurasi aktif langsung diperbarui (nilai lama tidak disimpan).
+  const aktif = await prisma.konfigurasi.findFirst({ where: { aktif: true }, orderBy: { versi: "desc" } });
+  if (aktif) {
+    await prisma.konfigurasi.update({ where: { id: aktif.id }, data: { data: data as object, dibuatId: user.id } });
+  } else {
+    await prisma.konfigurasi.create({ data: { versi: 1, data: data as object, aktif: true, dibuatId: user.id } });
+  }
   revalidatePath("/", "layout");
-  return { ok: true, message: `Tersimpan sebagai versi ${versi} dan langsung dipakai.` };
-}
-
-export async function activateConfig(fd: FormData) {
-  await requireAdmin();
-  const versi = Number(fd.get("versi"));
-  if (!Number.isInteger(versi)) return;
-  await prisma.$transaction([
-    prisma.konfigurasi.updateMany({ where: { aktif: true }, data: { aktif: false } }),
-    prisma.konfigurasi.update({ where: { versi }, data: { aktif: true } }),
-  ]);
-  revalidatePath("/", "layout");
-}
-
-export async function resetConfig() {
-  const user = await requireAdmin();
-  const data = await readDefaultConfig();
-  const last = await prisma.konfigurasi.findFirst({ orderBy: { versi: "desc" } });
-  await prisma.$transaction([
-    prisma.konfigurasi.updateMany({ where: { aktif: true }, data: { aktif: false } }),
-    prisma.konfigurasi.create({ data: { versi: (last?.versi ?? 0) + 1, data: data as object, aktif: true, catatan: "Dikembalikan ke nilai bawaan", dibuatId: user.id } }),
-  ]);
-  revalidatePath("/", "layout");
+  return { ok: true, message: "Parameter tersimpan dan langsung dipakai." };
 }

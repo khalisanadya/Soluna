@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { AppNav, LiveDot, NavSkeleton } from "@/components/nav";
 import { requireUser } from "@/lib/auth";
-import { getActiveConfig } from "@/lib/config";
 import { engineHealth } from "@/lib/engine";
 
 // Area terautentikasi: setiap halaman membaca sesi dan basis data per permintaan,
@@ -22,12 +21,9 @@ async function NavLoader() {
 }
 
 async function StatusPills() {
-  const [ok, config] = await Promise.all([engineHealth(), getActiveConfig()]);
+  const ok = await engineHealth();
   return (
     <div className="flex items-center gap-2">
-      <span className="hidden rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-ink-600 ring-1 ring-ink-200 sm:inline">
-        Konfigurasi v{config.versi}
-      </span>
       <LiveDot ok={ok} />
     </div>
   );

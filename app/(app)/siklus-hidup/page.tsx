@@ -1,206 +1,268 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, CheckCircle2, Recycle, Timer } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Info, Recycle, TrendingDown, TrendingUp } from "lucide-react";
 import { TrendLine } from "@/components/charts";
 import { Paginasi, potong } from "@/components/paginasi";
-import { Badge, Card, Disclaimer, EmptyState, GradeBadge, Notice, PageHeader, SectionTitle, Stat, buttonClass } from "@/components/ui";
+import { Badge, Card, Disclaimer, EmptyState, GradeBadge, Notice, PageHeader, SohBadge } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
 import { analisisSiklus, bateraiDinilaiUntukSiklus } from "@/lib/analisis";
 import { bulanTahun, cn, num, tanggal } from "@/lib/format";
-import type { StatusSiklus } from "@/lib/types";
-import { ReadingForm } from "./reading-form";
+import type { HasilSiklus, StatusSiklus } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Siklus Hidup" };
+export const metadata: Metadata = { title: "Pemantauan Baterai" };
 
-const STATUS: Record<StatusSiklus, { label: string; tone: "flame" | "amber" | "leaf" | "neutral" }> = {
-  daur_ulang: { label: "Daur ulang", tone: "flame" },
-  perhatian: { label: "Perlu perhatian", tone: "amber" },
-  normal: { label: "Normal", tone: "leaf" },
-  belum_dinilai: { label: "Belum dinilai", tone: "neutral" },
+type Baris = HasilSiklus["baterai"][number];
+type Filter = "daur_ulang" | "perhatian" | "normal";
+
+const STATUS: Record<StatusSiklus, { label: string; tone: "flame" | "amber" | "leaf" | "neutral"; urut: number }> = {
+  daur_ulang: { label: "Daur ulang", tone: "flame", urut: 0 },
+  perhatian: { label: "Perlu perhatian", tone: "amber", urut: 1 },
+  normal: { label: "Normal", tone: "leaf", urut: 2 },
+  belum_dinilai: { label: "Belum dinilai", tone: "neutral", urut: 3 },
 };
 
-export default async function SiklusHidupPage({ searchParams }: PageProps<"/siklus-hidup">) {
+/** Paling mendesak dulu: status, lalu sisa waktu terpendek. */
+function urutkan(a: Baris, b: Baris) {
+  return STATUS[a.status].urut - STATUS[b.status].urut || (a.sisa_tahun ?? Infinity) - (b.sisa_tahun ?? Infinity);
+}
+
+function sisaWaktu(r: Baris) {
+  if (r.status === "daur_ulang") return "Sekarang";
+  if (r.sisa_tahun === null) return "—";
+  if (r.sisa_tahun < 1) return `± ${Math.max(1, Math.round(r.sisa_tahun * 12))} bulan lagi`;
+  return `± ${num(r.sisa_tahun, 1)} tahun lagi`;
+}
+
+export default async function PemantauanPage({ searchParams }: PageProps<"/siklus-hidup">) {
   await requireAdmin();
   const sp = await searchParams;
-  const tab = sp.tab === "riwayat" ? "riwayat" : "jadwal";
   const [baterai, { data: cfg }] = await Promise.all([bateraiDinilaiUntukSiklus(), getActiveConfig()]);
   const res = await analisisSiklus(baterai);
   const byId = new Map(baterai.map((b) => [b.id, b]));
-  const selectedId = typeof sp.baterai === "string" && byId.has(sp.baterai) ? sp.baterai : baterai[0]?.id;
-  const selected = selectedId ? byId.get(selectedId) : undefined;
-  const ambang = cfg.siklus_hidup.ambang_penggantian_soh;
-  const jadwal = potong(res.ok ? res.data.baterai : [], sp);
-  const bacaanTerbaru = selected ? [...selected.bacaanSoh].reverse() : [];
-  const bacaanHal = potong(bacaanTerbaru, sp);
+  const sc = cfg.siklus_hidup;
+  const ambang = sc.ambang_penggantian_soh;
+
+  const header = (
+    <PageHeader
+      eyebrow="Baterai"
+      title="Pemantauan baterai"
+      description="Pantau kesehatan baterai yang sudah dinilai: mana yang masih aman, mana yang perlu disiapkan penggantinya, dan mana yang harus didaur ulang."
+    />
+  );
+
+  if (!res.ok) {
+    return (
+      <>
+        {header}
+        <Notice tone="danger" title="Data pemantauan tidak dapat dihitung">
+          {res.error}
+        </Notice>
+      </>
+    );
+  }
+  if (baterai.length === 0) {
+    return (
+      <>
+        {header}
+        <EmptyState title="Belum ada baterai yang dinilai" description="Baterai muncul di sini setelah pemasok menilainya dan menerbitkan paspor." />
+      </>
+    );
+  }
+
+  const filter: Filter | "" = sp.status === "daur_ulang" || sp.status === "perhatian" || sp.status === "normal" ? sp.status : "";
+  const semua = [...res.data.baterai].sort(urutkan);
+  const tersaring = filter ? semua.filter((r) => r.status === filter) : semua;
+  const hal = potong(tersaring, sp);
+  const pilihId = typeof sp.baterai === "string" && byId.has(sp.baterai) ? sp.baterai : hal.rows[0]?.id;
+  const pilih = pilihId ? semua.find((r) => r.id === pilihId) : undefined;
+  const pilihData = pilihId ? byId.get(pilihId) : undefined;
+  const bacaan = pilihData ? [...pilihData.bacaanSoh].reverse() : [];
+
+  const href = (ubah: Record<string, string | undefined>) => {
+    const q = new URLSearchParams();
+    const nilai = { status: filter || undefined, page: typeof sp.page === "string" ? sp.page : undefined, baterai: pilihId, ...ubah };
+    for (const [k, v] of Object.entries(nilai)) if (v) q.set(k, v);
+    const s = q.toString();
+    return `/siklus-hidup${s ? `?${s}` : ""}`;
+  };
+
+  const pilihan: { k: Filter | ""; label: string; titik: string; jumlah: number }[] = [
+    { k: "", label: "Semua", titik: "bg-ink-400", jumlah: semua.length },
+    { k: "daur_ulang", label: "Daur ulang", titik: "bg-flame-500", jumlah: res.data.ringkasan.daur_ulang },
+    { k: "perhatian", label: "Siapkan pengganti", titik: "bg-amber-500", jumlah: res.data.ringkasan.perhatian },
+    { k: "normal", label: "Aman", titik: "bg-leaf-500", jumlah: res.data.ringkasan.normal },
+  ];
+  const saran: Record<StatusSiklus, { teks: string; cls: string; icon: React.ReactNode }> = {
+    daur_ulang: { teks: "Arahkan ke daur ulang. Jangan dipasang ulang.", cls: "bg-flame-50 text-flame-700 ring-flame-100", icon: <Recycle className="size-4 shrink-0" /> },
+    perhatian: { teks: "Siapkan baterai pengganti.", cls: "bg-amber-50 text-amber-700 ring-amber-100", icon: <AlertTriangle className="size-4 shrink-0" /> },
+    normal: { teks: "Aman. Ukur ulang SoH tiap 3–6 bulan.", cls: "bg-leaf-50 text-leaf-700 ring-leaf-100", icon: <CheckCircle2 className="size-4 shrink-0" /> },
+    belum_dinilai: { teks: "Belum dinilai.", cls: "bg-ink-50 text-ink-600 ring-ink-100", icon: <Info className="size-4 shrink-0" /> },
+  };
 
   return (
     <>
-      <PageHeader
-        eyebrow="Modul D · Siklus hidup"
-        title="Siklus hidup baterai"
-        description="Jadwal penggantian, peringatan dini, tren SoH dari pembacaan berkala, dan jalur daur ulang. Pemantauan memakai input manual, bukan telemetri real-time."
-      />
-      {!res.ok ? (
-        <Notice tone="danger" title="Analisis siklus hidup gagal">
-          {res.error}
-        </Notice>
-      ) : baterai.length === 0 ? (
-        <EmptyState title="Belum ada baterai yang dinilai" description="Nilai baterai di Modul A untuk mulai memantau siklus hidupnya." />
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            <Stat label="Daur ulang" value={res.data.ringkasan.daur_ulang} icon={<Recycle className="size-4" />} accent="flame" hint={`SoH < ${ambang}% atau grade D`} />
-            <Stat label="Perlu perhatian" value={res.data.ringkasan.perhatian} icon={<AlertTriangle className="size-4" />} accent="sun" hint={`SoH ≤ ${ambang + cfg.siklus_hidup.margin_peringatan_soh}% atau sisa < ${cfg.siklus_hidup.batas_sisa_umur_tahun} th`} />
-            <Stat label="Normal" value={res.data.ringkasan.normal} icon={<CheckCircle2 className="size-4" />} accent="leaf" />
-            <Stat label="Ambang penggantian" value={ambang} unit="% SoH" icon={<Timer className="size-4" />} accent="ink" hint="Dari konfigurasi" />
-          </div>
+      {header}
 
-          <div className="my-5 flex gap-2" role="tablist">
-            {[
-              { k: "jadwal", t: "Jadwal & peringatan" },
-              { k: "riwayat", t: "Riwayat SoH" },
-            ].map((t) => (
-              <Link key={t.k} role="tab" aria-selected={tab === t.k} href={`/siklus-hidup?tab=${t.k}${selectedId ? `&baterai=${selectedId}` : ""}`} className={buttonClass(tab === t.k ? "dark" : "secondary", "sm")}>
-                {t.t}
+      {/* Filter status */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav className="flex flex-wrap gap-1 rounded-full bg-ink-100/80 p-1 ring-1 ring-ink-200/50" aria-label="Filter status">
+          {pilihan.map((c) => {
+            const aktif = filter === c.k;
+            return (
+              <Link
+                key={c.k || "semua"}
+                href={href({ status: c.k || undefined, baterai: undefined, page: undefined })}
+                aria-current={aktif ? "true" : undefined}
+                className={cn(
+                  "flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+                  aktif ? "bg-surface text-ink-950 shadow-soft ring-1 ring-ink-200/60" : "text-ink-500 hover:text-ink-900",
+                )}
+              >
+                <span className={cn("size-2 rounded-full", c.titik)} aria-hidden="true" />
+                {c.label}
+                <span className="num text-xs text-ink-400">{c.jumlah}</span>
               </Link>
-            ))}
-          </div>
+            );
+          })}
+        </nav>
+        <p className="text-xs text-ink-500">
+          Daur ulang: SoH &lt; {num(ambang)}% atau grade D · Siapkan pengganti: SoH ≤ {num(ambang + sc.margin_peringatan_soh)}% atau sisa &lt;{" "}
+          {num(sc.batas_sisa_umur_tahun)} th
+        </p>
+      </div>
 
-          {tab === "jadwal" ? (
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Card className="overflow-x-auto lg:col-span-2">
-                <SectionTitle title="Jadwal penggantian" hint="Dari tren SoH berkala, atau estimasi sisa umur penilaian" />
-                <table className="w-full min-w-[560px] text-sm">
-                  <thead className="text-left text-xs text-ink-500">
-                    <tr className="border-b border-ink-100">
-                      <th className="py-2 pr-3 font-medium">Baterai</th>
-                      <th className="px-3 py-2 text-center font-medium">SoH</th>
-                      <th className="px-3 py-2 text-center font-medium">Tren</th>
-                      <th className="px-3 py-2 text-center font-medium">Ganti sekitar</th>
-                      <th className="py-2 pl-3 text-center font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-ink-100">
-                    {jadwal.rows.map((r) => {
-                      const b = byId.get(r.id)!;
-                      return (
-                        <tr key={r.id}>
-                          <td className="py-3 pr-3">
-                            <Link href={`/siklus-hidup?tab=riwayat&baterai=${r.id}`} className="flex items-center gap-2 hover:underline">
-                              <GradeBadge grade={b.gradeTerakhir} size="sm" />
-                              <span className="num font-semibold">{r.kode}</span>
-                            </Link>
-                            <span className="text-xs text-ink-500">
-                              {b.merek} {b.model}
-                            </span>
-                          </td>
-                          <td className="num px-3 py-3 text-center">{num(r.soh)}%</td>
-                          <td className={cn("num px-3 py-3 text-center", (r.tren_per_tahun ?? 0) < -8 && "text-flame-600")}>{r.tren_per_tahun !== null ? `${num(r.tren_per_tahun, 1)}%/th` : "—"}</td>
-                          <td className="px-3 py-3 text-center">
-                            <span className="font-medium">{r.status === "daur_ulang" ? "Sekarang" : bulanTahun(r.jadwal_penggantian)}</span>
-                            {r.dasar_jadwal && <span className="block text-xs text-ink-500">{r.dasar_jadwal}</span>}
-                          </td>
-                          <td className="py-3 pl-3 text-center">
-                            <Badge tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Badge>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <Paginasi basePath="/siklus-hidup" sp={sp} halaman={jadwal.halaman} total={res.data.baterai.length} tampil={jadwal.rows.length} satuan="baterai" className="border-t border-ink-100 pt-3" />
-              </Card>
-              <div className="space-y-4">
-                <Card>
-                  <SectionTitle title="Peringatan dini" />
-                  {res.data.baterai.some((r) => r.peringatan.length) ? (
-                    <ul className="space-y-3">
-                      {res.data.baterai
-                        .filter((r) => r.peringatan.length)
-                        .map((r) => (
-                          <li key={r.id} className={cn("rounded-2xl p-3 text-sm ring-1", r.status === "daur_ulang" ? "bg-flame-50 ring-flame-100" : "bg-amber-50 ring-amber-100")}>
-                            <Link href={`/baterai/${r.id}`} className="num font-semibold hover:underline">
-                              {r.kode}
-                            </Link>
-                            <ul className="mt-1 space-y-1 text-ink-700">
-                              {r.peringatan.map((w) => (
-                                <li key={w}>{w}</li>
-                              ))}
-                            </ul>
-                          </li>
-                        ))}
-                    </ul>
+      <div className="mt-4 grid items-start gap-4 lg:grid-cols-5">
+        {/* Daftar baterai */}
+        <Card className="!p-0 lg:col-span-3">
+          {hal.rows.length ? (
+            <ul className="divide-y divide-ink-100">
+              {hal.rows.map((r) => {
+                const b = byId.get(r.id)!;
+                const aktif = r.id === pilihId;
+                return (
+                  <li key={r.id}>
+                    <Link
+                      href={href({ baterai: r.id })}
+                      scroll={false}
+                      aria-current={aktif ? "true" : undefined}
+                      className={cn(
+                        "flex items-center gap-3 border-l-[3px] px-4 py-2.5 transition-colors",
+                        aktif ? "border-sun-500 bg-sun-50" : "border-transparent hover:bg-ink-50",
+                      )}
+                    >
+                      <GradeBadge grade={b.gradeTerakhir} size="sm" />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="num text-sm font-semibold text-ink-900">{r.kode}</span>
+                          <span className="truncate text-xs text-ink-500">
+                            {b.merek} {b.model}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1.5 text-xs text-ink-500">
+                          <span className={cn("size-1.5 rounded-full", pilihan.find((p) => p.k === r.status)?.titik ?? "bg-ink-300")} aria-hidden="true" />
+                          {STATUS[r.status].label} · ganti {sisaWaktu(r).toLowerCase()}
+                        </span>
+                      </span>
+                      <SohBadge soh={r.soh} tinggi={cfg.grade.A} rendah={cfg.grade.C} />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <EmptyState title="Tidak ada baterai dengan status ini" className="m-4 py-8" />
+          )}
+          <div className="border-t border-ink-100 px-4 pb-3">
+            <Paginasi basePath="/siklus-hidup" sp={sp} halaman={hal.halaman} total={tersaring.length} tampil={hal.rows.length} satuan="baterai" />
+          </div>
+        </Card>
+
+        {/* Detail baterai terpilih: satu kartu */}
+        {pilih && pilihData && (
+          <Card className="!p-0 lg:sticky lg:top-6 lg:col-span-2">
+            <div className="flex items-center gap-3 p-4">
+              <GradeBadge grade={pilihData.gradeTerakhir} />
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-2">
+                  <span className="num font-bold text-ink-950">{pilih.kode}</span>
+                  <Badge tone={STATUS[pilih.status].tone}>{STATUS[pilih.status].label}</Badge>
+                </p>
+                <p className="truncate text-xs text-ink-500">
+                  {pilihData.merek} {pilihData.model} · {pilihData.jenisKimia}
+                </p>
+              </div>
+              <Link href={`/baterai/${pilih.id}`} className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-sun-700 hover:underline">
+                Detail <ArrowRight className="size-3.5" />
+              </Link>
+            </div>
+
+            <dl className="grid grid-cols-3 divide-x divide-ink-100 border-y border-ink-100 text-center">
+              <div className="px-2 py-2.5">
+                <dt className="text-[0.68rem] text-ink-500">SoH</dt>
+                <dd className="num text-base font-semibold text-ink-950">{num(pilih.soh)}%</dd>
+              </div>
+              <div className="px-2 py-2.5">
+                <dt className="text-[0.68rem] text-ink-500">Tren/tahun</dt>
+                <dd className={cn("num flex items-center justify-center gap-1 text-base font-semibold", (pilih.tren_per_tahun ?? 0) < 0 ? "text-flame-600" : "text-ink-950")}>
+                  {pilih.tren_per_tahun === null ? (
+                    "—"
                   ) : (
-                    <p className="text-sm text-ink-500">Tidak ada peringatan.</p>
+                    <>
+                      {pilih.tren_per_tahun < 0 ? <TrendingDown className="size-3.5" /> : <TrendingUp className="size-3.5" />}
+                      {num(Math.abs(pilih.tren_per_tahun), 1)}%
+                    </>
                   )}
-                </Card>
-                <Card tone="ink">
-                  <p className="flex items-center gap-2 font-semibold">
-                    <Recycle className="size-4 text-sun-400" /> Jalur daur ulang
-                  </p>
-                  <p className="mt-2 text-sm text-ink-300">Baterai grade D atau di bawah ambang tidak dipasang ulang. Status paspornya diarahkan ke daur ulang.</p>
-                  <ul className="mt-3 space-y-1.5 text-sm">
-                    {res.data.baterai
-                      .filter((r) => r.jalur_daur_ulang)
-                      .map((r) => (
-                        <li key={r.id} className="flex justify-between">
-                          <Link href={`/baterai/${r.id}`} className="num hover:underline">
-                            {r.kode}
-                          </Link>
-                          <span className="num text-ink-400">{num(r.soh)}%</span>
-                        </li>
-                      ))}
+                </dd>
+              </div>
+              <div className="px-2 py-2.5">
+                <dt className="text-[0.68rem] text-ink-500">Ganti</dt>
+                <dd className="text-sm font-semibold text-ink-950">{pilih.status === "daur_ulang" ? "Sekarang" : bulanTahun(pilih.jadwal_penggantian)}</dd>
+              </div>
+            </dl>
+
+            <div className="space-y-3 p-4">
+              <div className={cn("rounded-xl p-2.5 text-xs ring-1", saran[pilih.status].cls)}>
+                <p className="flex items-center gap-2 font-semibold">
+                  {saran[pilih.status].icon} {saran[pilih.status].teks}
+                </p>
+                {pilih.status === "perhatian" && pilih.peringatan.length > 0 && (
+                  <ul className="mt-1 list-disc space-y-0.5 pl-10">
+                    {pilih.peringatan.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
                   </ul>
-                </Card>
+                )}
+              </div>
+
+              <div>
+                <p className="mb-1 flex items-baseline justify-between text-xs">
+                  <span className="font-semibold text-ink-900">Tren SoH</span>
+                  <span className="text-ink-400">garis merah = batas ganti {num(ambang)}%</span>
+                </p>
+                {pilihData.bacaanSoh.length >= 2 ? (
+                  <TrendLine points={pilihData.bacaanSoh.map((r) => ({ x: r.tanggal.toISOString(), y: r.soh }))} threshold={ambang} warn={ambang + sc.margin_peringatan_soh} height={130} />
+                ) : (
+                  <p className="flex items-start gap-2 rounded-xl bg-ink-50 p-2.5 text-xs text-ink-600">
+                    <Info className="mt-px size-3.5 shrink-0" /> Grafik tren muncul setelah ada minimal 2 pengukuran.
+                  </p>
+                )}
+                {bacaan.length > 0 && (
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {bacaan.slice(0, 4).map((r) => (
+                      <li key={r.id} className="rounded-full bg-ink-50 px-2.5 py-0.5 text-xs text-ink-600 ring-1 ring-ink-100" title={r.sumber === "PENILAIAN" ? "Dari penilaian" : "Pengukuran berkala"}>
+                        {tanggal(r.tanggal)} · <span className="num font-semibold text-ink-900">{num(r.soh)}%</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
-          ) : (
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Card className="lg:col-span-2">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="font-semibold">Tren SoH {selected && <span className="num">{selected.kode}</span>}</h2>
-                    <p className="text-sm text-ink-500">Area kuning: zona peringatan · garis merah: ambang penggantian</p>
-                  </div>
-                  <form className="flex gap-2">
-                    <input type="hidden" name="tab" value="riwayat" />
-                    <select name="baterai" defaultValue={selectedId} className="h-9 rounded-full bg-surface px-3 text-sm ring-1 ring-ink-200">
-                      {baterai.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.kode} · {b.merek} {b.model}
-                        </option>
-                      ))}
-                    </select>
-                    <button className={buttonClass("dark", "sm")}>Lihat</button>
-                  </form>
-                </div>
-                {selected && selected.bacaanSoh.length ? (
-                  <>
-                    <TrendLine points={selected.bacaanSoh.map((r) => ({ x: r.tanggal.toISOString(), y: r.soh }))} threshold={ambang} warn={ambang + cfg.siklus_hidup.margin_peringatan_soh} height={220} />
-                    <ul className="mt-4 divide-y divide-ink-100 text-sm">
-                      {bacaanHal.rows.map((r) => (
-                        <li key={r.id} className="flex items-center justify-between py-2">
-                          <span className="flex items-center gap-2">
-                            <CalendarClock className="size-4 text-ink-400" /> {tanggal(r.tanggal)}
-                            <Badge tone={r.sumber === "PENILAIAN" ? "sky" : "neutral"}>{r.sumber === "PENILAIAN" ? "Penilaian" : "Manual"}</Badge>
-                          </span>
-                          <span className="num font-medium">{num(r.soh)}%</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Paginasi basePath="/siklus-hidup" sp={sp} halaman={bacaanHal.halaman} total={bacaanTerbaru.length} tampil={bacaanHal.rows.length} satuan="pembacaan" />
-                  </>
-                ) : (
-                  <EmptyState title="Belum ada pembacaan" className="py-8" />
-                )}
-              </Card>
-              <ReadingForm baterai={baterai.map((b) => ({ id: b.id, label: `${b.kode} · ${b.merek} ${b.model}` }))} selectedId={selectedId} />
-            </div>
-          )}
-          <Disclaimer className="mt-6" />
-        </>
-      )}
+          </Card>
+        )}
+      </div>
+
+      <Disclaimer className="mt-6" />
     </>
   );
 }

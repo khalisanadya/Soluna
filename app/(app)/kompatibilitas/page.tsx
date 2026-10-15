@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Badge, Card, PageHeader, SectionTitle } from "@/components/ui";
 import { Paginasi, bacaHalaman } from "@/components/paginasi";
 import { requireAdmin } from "@/lib/auth";
-import { getActiveConfig } from "@/lib/config";
 import { num, tanggal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { HasilKompatibilitas, HasilRencana } from "@/lib/types";
@@ -15,16 +14,16 @@ const tone = { layak: "leaf", perlu_penyesuaian: "amber", tidak_layak: "flame" }
 export default async function KompatibilitasPage({ searchParams }: PageProps<"/kompatibilitas">) {
   await requireAdmin();
   const sp = await searchParams;
-  const bateraiId = typeof sp.baterai === "string" ? sp.baterai : "";
   const rencanaId = typeof sp.rencana === "string" ? sp.rencana : "";
-  const [{ data: cfg }, daftarBaterai, daftarRencana, totalRiwayat] = await Promise.all([
-    getActiveConfig(),
+  // Dibuka dari halaman rencana desa: rencana dikunci agar pemeriksaan tetap untuk rencana itu.
+  const kunciRencana = sp.kunci === "1" && Boolean(rencanaId);
+  const [daftarBaterai, daftarRencana, totalRiwayat] = await Promise.all([
     prisma.baterai.findMany({
       where: { status: "DINILAI" },
       orderBy: { kode: "asc" },
       select: { id: true, kode: true, merek: true, model: true, teganganNominalV: true, gradeTerakhir: true, sohTerakhir: true, kapasitasAwalKwh: true },
     }),
-    prisma.rencanaDesa.findMany({ orderBy: { createdAt: "desc" }, take: 50, select: { id: true, nama: true, namaDesa: true, hasil: true } }),
+    prisma.rencanaDesa.findMany({ orderBy: { createdAt: "desc" }, take: 50, select: { id: true, nama: true, namaDesa: true, hasil: true, bateraiIds: true } }),
     prisma.cekKompatibilitas.count(),
   ]);
   const halRiwayat = bacaHalaman(sp, totalRiwayat);
@@ -34,34 +33,30 @@ export default async function KompatibilitasPage({ searchParams }: PageProps<"/k
     take: halRiwayat.take,
     include: { baterai: { select: { kode: true } }, rencana: { select: { namaDesa: true } } },
   });
-  const baterai = daftarBaterai.find((b) => b.id === bateraiId);
   const rencana = daftarRencana.find((r) => r.id === rencanaId);
   const h = rencana?.hasil as HasilRencana | undefined;
+  // Baterai: dari tautan, atau baterai pertama yang sudah dipilih untuk rencana ini.
+  const bateraiRencana = rencana ? daftarBaterai.filter((b) => rencana.bateraiIds.includes(b.id)) : [];
+  const bateraiId = typeof sp.baterai === "string" && daftarBaterai.some((b) => b.id === sp.baterai) ? sp.baterai : (bateraiRencana[0]?.id ?? "");
+  const baterai = daftarBaterai.find((b) => b.id === bateraiId);
 
-  // Rencana mengisi daya & jumlah paket; baterai terpilih mengisi data baterainya sendiri.
+  // Data baterai tidak diisi manual: semuanya dari hasil penilaian baterai.
+  const dataBaterai = baterai
+    ? {
+        kode: baterai.kode,
+        tegangan: baterai.teganganNominalV,
+        grade: baterai.gradeTerakhir,
+        soh: baterai.sohTerakhir,
+        kapasitas: baterai.kapasitasAwalKwh,
+        paket: h ? h.ringkasan.jumlah_paket : 1,
+      }
+    : null;
+  // Rencana mengisi daya inverter dan beban puncak.
   const initial: Record<string, string> = {
     vNominal: "48",
     vMin: "40",
     vMaks: "60",
-    ...(h
-      ? {
-          vBaterai: String(cfg.profil_paket.tegangan_nominal_v),
-          kwInverter: String(h.ringkasan.inverter_kw),
-          kwPuncak: String(h.ringkasan.daya_puncak_kw),
-          paket: String(h.ringkasan.jumlah_paket),
-          kapasitas: String(h.parameter.kapasitas_paket_kwh),
-          soh: String(Math.round(h.parameter.soh_paket * 1000) / 10),
-        }
-      : {}),
-    ...(baterai
-      ? {
-          vBaterai: baterai.teganganNominalV ? String(baterai.teganganNominalV) : "",
-          grade: baterai.gradeTerakhir ?? "",
-          soh: baterai.sohTerakhir !== null ? String(baterai.sohTerakhir) : "",
-          kapasitas: String(baterai.kapasitasAwalKwh),
-          paket: h ? String(h.ringkasan.jumlah_paket) : "1",
-        }
-      : {}),
+    ...(h ? { kwInverter: String(h.ringkasan.inverter_kw), kwPuncak: String(h.ringkasan.daya_puncak_kw) } : {}),
   };
 
   return (
@@ -72,7 +67,13 @@ export default async function KompatibilitasPage({ searchParams }: PageProps<"/k
         initial={initial}
         bateraiId={baterai?.id ?? ""}
         rencanaId={rencana?.id ?? ""}
-        daftarBaterai={daftarBaterai.map((b) => ({ id: b.id, label: `${b.kode} · ${b.merek} ${b.model}${b.gradeTerakhir ? ` · grade ${b.gradeTerakhir}` : ""}` }))}
+        kunciRencana={kunciRencana && Boolean(rencana)}
+        dataBaterai={dataBaterai}
+        daftarBaterai={daftarBaterai.map((b) => ({
+          id: b.id,
+          label: `${b.kode} · ${b.merek} ${b.model}${b.gradeTerakhir ? ` · grade ${b.gradeTerakhir}` : ""}`,
+          diRencana: Boolean(rencana?.bateraiIds.includes(b.id)),
+        }))}
         daftarRencana={daftarRencana.map((r) => ({ id: r.id, label: `${r.namaDesa} — ${r.nama}` }))}
         riwayat={
           <Card className="!p-4">

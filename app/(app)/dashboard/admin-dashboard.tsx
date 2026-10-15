@@ -7,7 +7,6 @@ import {
   ClipboardCheck,
   Clock3,
   CloudRain,
-  Fuel,
   Home,
   PlugZap,
   Recycle,
@@ -112,7 +111,7 @@ export async function AdminDashboard() {
         actions={
           <>
             <ButtonLink href="/baterai" variant="secondary">
-              <BatteryCharging className="size-4" /> Tambah / Cari baterai
+              <BatteryCharging className="size-4" /> Cari baterai
             </ButtonLink>
             <ButtonLink href="/perencana/baru">
               <SunMedium className="size-4" /> Rencana baru
@@ -131,7 +130,7 @@ export async function AdminDashboard() {
       {rencana ? <RingkasanPengelolaan hasil={rencana.hasil as unknown as HasilRencana} namaDesa={rencana.namaDesa} jumlahRumah={(rencana.masukan as { jumlah_rumah?: number }).jumlah_rumah} /> : (
         <Card className="mb-4 border-dashed">
           <SectionTitle title="Profil energi desa belum tersedia" />
-          <p className="text-sm text-ink-600">Buat rencana desa untuk melihat kebutuhan energi, penghematan diesel, iuran, dan titik impas.</p>
+          <p className="text-sm text-ink-600">Buat rencana desa untuk melihat kebutuhan energi, biaya per rumah, dan iuran perawatan.</p>
           <ButtonLink href="/perencana/baru" className="mt-3">Buat rencana desa</ButtonLink>
         </Card>
       )}
@@ -264,7 +263,7 @@ export async function AdminDashboard() {
               </Link>{" "}
               dan{" "}
               <Link href="/siklus-hidup" className="font-medium text-ink-700 hover:underline">
-                Siklus Hidup
+                Pemantauan Baterai
               </Link>
               .
             </p>
@@ -342,7 +341,7 @@ function Angka({ label, nilai, detail }: { label: string; nilai: string; detail:
 function RingkasanPengelolaan({ hasil, namaDesa, jumlahRumah }: { hasil: HasilRencana; namaDesa: string; jumlahRumah?: number }) {
   const r = hasil.ringkasan;
   const b = hasil.biaya;
-  const impas = b.titik_impas_tahun;
+  const per = b.periode_hari === 365 ? "tahun" : "bulan";
   return (
     <Card className="mb-4">
       <SectionTitle
@@ -352,17 +351,12 @@ function RingkasanPengelolaan({ hasil, namaDesa, jumlahRumah }: { hasil: HasilRe
       />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Angka label="Rumah terlayani" nilai={jumlahRumah ? num(jumlahRumah, 0) : "—"} detail={`${num(r.kebutuhan_harian_kwh)} kWh kebutuhan harian`} />
-        <Angka label="Penghematan diesel" nilai={`${num(hasil.lingkungan.diesel_hemat_liter, 0)} liter`} detail={`selama ${hasil.lingkungan.periode_hari} hari`} />
+        <Angka label="Biaya listrik" nilai={rentang(b.sistem_per_rumah)} detail={`per rumah setiap ${per}`} />
         <Angka label="Iuran perawatan" nilai={rentang(b.iuran_perawatan_per_rumah_bulan)} detail="per rumah setiap bulan" />
-        <Angka
-          label="Titik impas"
-          nilai={impas && impas.rendah !== null && impas.tinggi !== null ? `${num(impas.rendah, 1)}–${num(impas.tinggi, 1)} th` : "Belum dihitung"}
-          detail={impas ? "dibandingkan biaya diesel" : "buat ulang rencana untuk menghitung"}
-        />
+        <Angka label="CO₂ dihindari" nilai={`${num(hasil.lingkungan.co2_dihindari_kg, 0)} kg`} detail={`setiap ${per}`} />
       </div>
       <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-ink-100 pt-3 text-sm text-ink-600">
         <span className="inline-flex items-center gap-2"><Home className="size-4 text-sun-700" /> Desa: {namaDesa}</span>
-        <span className="inline-flex items-center gap-2"><Fuel className="size-4 text-flame-500" /> Setara biaya diesel: {rentang(b.diesel_per_rumah)} / rumah / {b.periode_hari} hari</span>
         <span className="inline-flex items-center gap-2"><Wrench className="size-4 text-ink-500" /> {r.jumlah_paket} paket baterai · {num(r.kapasitas_panel_terpasang_kwp)} kWp surya</span>
       </div>
     </Card>
@@ -431,14 +425,10 @@ function RingkasanEnergi({
         <Angka label="Inverter" nilai={`${num(r.inverter_kw, 0)} kW`} detail={`puncak ${num(r.daya_puncak_kw)} kW`} />
       </div>
 
-      <dl className="mt-5 grid gap-x-6 gap-y-2 border-t border-ink-100 pt-4 text-sm sm:grid-cols-3">
+      <dl className="mt-5 grid gap-x-6 gap-y-2 border-t border-ink-100 pt-4 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-xs text-ink-500">Sistem / rumah · {b.periode_hari} hari</dt>
           <dd className="num font-semibold text-ink-900">{rentang(b.sistem_per_rumah)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-ink-500">Setara diesel / rumah · {b.periode_hari} hari</dt>
-          <dd className="num font-semibold text-sun-700">{rentang(b.diesel_per_rumah)}</dd>
         </div>
         <div>
           <dt className="text-xs text-ink-500">Iuran perawatan / rumah</dt>
@@ -508,7 +498,7 @@ function Ketahanan({ simulasi, rencanaId }: { simulasi: { hasil: unknown; create
                 <span className="num font-semibold text-ink-950">{days(lama)}</span>
               </div>
               <Progress value={lama === null ? periode : Math.min(lama, periode)} max={periode} color={s.cukup_pelepasan ? "bg-leaf-500" : "bg-sun-500"} className="mt-1.5" />
-              {!s.cukup_pelepasan && <p className="mt-1 text-xs text-ink-500">Genset ±{num(s.jam_genset_pelepasan, 1)} jam</p>}
+              {!s.cukup_pelepasan && <p className="mt-1 text-xs text-ink-500">Kekurangan listrik ±{num(s.jam_genset_pelepasan, 1)} jam</p>}
             </li>
           );
         })}

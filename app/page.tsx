@@ -34,7 +34,7 @@ const FITUR = [
     t: "Perencanaan & Ketahanan",
     q: "Cukupkah untuk desa?",
     d: "Hitung paket baterai, panel, dan inverter, lalu uji saat mendung atau hujan.",
-    poin: ["Biaya vs genset", "Simulasi cuaca", "Prioritas beban"],
+    poin: ["Biaya per rumah", "Simulasi cuaca", "Prioritas beban"],
     icon: SunMedium,
     card: "bg-zest-300 ring-1 ring-zest-400",
     badge: "bg-ink-950 text-zest-300",
@@ -136,7 +136,7 @@ export default function Landing() {
               {[
                 { icon: BatteryCharging, t: "Grade A–D", c: "text-leaf-600" },
                 { icon: CloudRain, t: "Uji cuaca buruk", c: "text-sky-600" },
-                { icon: SunMedium, t: "Biaya vs genset", c: "text-sun-600" },
+                { icon: SunMedium, t: "Biaya per rumah", c: "text-sun-600" },
               ].map(({ icon: I, t, c }) => (
                 <li key={t} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
                   <I className={cn("size-4 shrink-0", c)} />

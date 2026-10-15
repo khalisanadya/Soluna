@@ -151,7 +151,7 @@ const paketBawaan = z.object({
   kapasitasPaket: angkaWajib("Kapasitas per paket", (n) => n.positive("Kapasitas harus lebih dari 0.").max(1000, "Kapasitas maksimal 1.000 kWh.")),
   sohPaket: angkaWajib("SoH paket", (n) => n.min(1, "SoH paket 1–100%.").max(100, "SoH paket 1–100%.")),
 });
-const paketBaterai = z.object({ bateraiId: z.string("Pilih satu baterai untuk rencana ini.").trim().min(1, "Pilih satu baterai untuk rencana ini.") });
+const paketBaterai = z.object({ bateraiId: z.string("Pilih minimal satu baterai untuk rencana ini.").trim().min(1, "Pilih minimal satu baterai untuk rencana ini.") });
 
 export const RENCANA_FIELDS = [...Object.keys(rencanaDasar.shape), "kapasitasPaket", "sohPaket", "bateraiId"];
 

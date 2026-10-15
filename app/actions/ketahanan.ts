@@ -59,5 +59,9 @@ export async function saveSimulation(raw: InputKetahanan, nama: string, rencanaI
     },
   });
   revalidatePath("/riwayat");
-  return { ok: true, message: "Simulasi tersimpan di riwayat." };
+  // Langkah berikutnya di halaman rencana selalu memakai simulasi terakhir yang disimpan.
+  if (rencanaId) revalidatePath(`/perencana/${rencanaId}`);
+  revalidatePath("/dashboard");
+  const waktu = new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date());
+  return { ok: true, message: rencanaId ? `Simulasi tersimpan (${waktu}) dan langkah berikutnya di rencana desa sudah diperbarui.` : `Simulasi tersimpan (${waktu}).` };
 }

@@ -47,16 +47,18 @@ export async function AdminBatteryLookup({ query, message }: { query: string; me
     <>
       <PageHeader
         eyebrow="Aset desa"
-        title="Tambah / Cari Baterai"
+        title="Cari Baterai"
         description="Masukkan nomor seri untuk mengambil data baterai dan assessment dari database pemasok."
       />
       <Card className="mb-4">
+        <label htmlFor="serial" className="mb-1.5 block text-sm font-medium text-ink-800">
+          Nomor seri baterai
+        </label>
         <form className="flex flex-col gap-3 sm:flex-row" role="search">
-          <label className="sr-only" htmlFor="serial">Nomor Seri Baterai</label>
           <input id="serial" name="q" defaultValue={query} placeholder="Nomor Seri Baterai, mis. BAT-0001" className="min-w-0 flex-1 rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm outline-none focus:border-sun-500 focus:ring-2 focus:ring-sun-200" />
           <Button type="submit"><Search className="size-4" /> Cari</Button>
         </form>
-        <p className="mt-2 text-xs text-ink-500">Admin Desa tidak membuat data baru dari nomor seri dan tidak mengubah hasil assessment.</p>
+        
       </Card>
 
       {message === "terdaftar" && <div className="mb-4 rounded-xl bg-leaf-50 px-4 py-3 text-sm text-leaf-800">Baterai berhasil ditambahkan ke aset desa.</div>}

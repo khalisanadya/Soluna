@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { SunMedium } from "lucide-react";
+import { CheckCircle2, Plus, SunMedium } from "lucide-react";
+import { pilihBateraiRencana } from "@/app/actions/pencocokan";
+import { SubmitButton } from "@/components/submit-button";
 import { Badge, ButtonLink, Card, Disclaimer, EmptyState, GradeBadge, IlustrasiTag, Notice, PageHeader, SectionTitle, buttonClass } from "@/components/ui";
 import { Paginasi, potong } from "@/components/paginasi";
 import { cocokkanBaterai } from "@/lib/analisis";
@@ -26,14 +28,14 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
   const rencana = await prisma.rencanaDesa.findMany({
     orderBy: { createdAt: "desc" },
     take: 30,
-    select: { id: true, nama: true, namaDesa: true, hasil: true, createdAt: true, ilustrasi: true },
+    select: { id: true, nama: true, namaDesa: true, hasil: true, createdAt: true, ilustrasi: true, bateraiIds: true },
   });
 
   const header = (
     <PageHeader
       eyebrow="Baterai"
       title="Pencocokan baterai"
-      description="Bandingkan baterai yang tersedia dengan kebutuhan satu rencana desa. Status disusun dari grade, ambang penggantian, daya puncak, dan hasil pemeriksaan kompatibilitas."
+      description="Bandingkan baterai yang tersedia dengan kebutuhan satu rencana desa."
     />
   );
 
@@ -51,7 +53,23 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
     );
   }
 
-  const terpilih = rencana.find((r) => r.id === sp.rencana) ?? rencana[0];
+  const terpilih = rencana.find((r) => r.id === sp.rencana);
+  const pilihanRencana = rencana.map((r) => ({ id: r.id, label: `${r.namaDesa} — ${r.nama} · ${tanggal(r.createdAt)}` }));
+  if (!terpilih) {
+    return (
+      <>
+        {header}
+        <Suspense fallback={<div className="mb-4 h-24 rounded-[var(--radius-card)] bg-surface ring-1 ring-ink-200/60" />}>
+          <PencocokanFilter rencana={pilihanRencana} terpilihId="" jumlah={null} saran={{ kode: [], merek: [], pemasok: [] }} />
+        </Suspense>
+        <EmptyState
+          icon={<SunMedium className="size-5" />}
+          title="Pilih rencana desa"
+          description="Pilih rencana desa di atas untuk melihat baterai mana yang cocok dengan kebutuhannya."
+        />
+      </>
+    );
+  }
   const hasil = terpilih.hasil as unknown as HasilRencana;
   const { res, kompat } = await cocokkanBaterai(hasil);
   const detail = new Map(
@@ -82,7 +100,7 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
   const dasar = semua.filter((r) => {
     const b = detail.get(r.id);
     if (grade && (r.status === "belum_dinilai" || b?.gradeTerakhir !== grade)) return false;
-    if (q && ![r.kode, b?.merek, b?.model, b?.pemasok.namaPerusahaan].some((x) => x?.toLowerCase().includes(q))) return false;
+    if (q && ![r.kode, b?.merek, b?.model, b ? `${b.merek} ${b.model}` : undefined, b?.pemasok.namaPerusahaan].some((x) => x?.toLowerCase().includes(q))) return false;
     return true;
   });
   const jumlah = {
@@ -95,6 +113,9 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
   for (const r of dasar) jumlah[r.status]++;
   const tersaring = status && status in jumlah ? dasar.filter((r) => r.status === status) : dasar;
   const hal = potong(tersaring, sp);
+  const dipilih = new Set(terpilih.bateraiIds);
+  const dipilihList = semua.filter((r) => dipilih.has(r.id));
+  const kwhDipilih = dipilihList.reduce((n, r) => n + (detail.get(r.id)?.kapasitasAwalKwh ?? 0), 0);
 
   return (
     <>
@@ -102,9 +123,14 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
 
       <Suspense fallback={<div className="mb-4 h-[14rem] rounded-[var(--radius-card)] bg-surface ring-1 ring-ink-200/60" />}>
         <PencocokanFilter
-          rencana={rencana.map((r) => ({ id: r.id, label: `${r.namaDesa} — ${r.nama} · ${tanggal(r.createdAt)}` }))}
+          rencana={pilihanRencana}
           terpilihId={terpilih.id}
           jumlah={jumlah}
+          saran={{
+            kode: [...new Set([...detail.values()].map((b) => b.kode))].sort(),
+            merek: [...new Set([...detail.values()].map((b) => `${b.merek} ${b.model}`))].sort((a, b) => a.localeCompare(b, "id")),
+            pemasok: [...new Set([...detail.values()].map((b) => b.pemasok.namaPerusahaan))].sort((a, b) => a.localeCompare(b, "id")),
+          }}
         />
       </Suspense>
 
@@ -128,6 +154,38 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
         ))}
       </div>
 
+      <div
+        className={cn(
+          "mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm ring-1",
+          dipilihList.length ? "bg-leaf-50 text-leaf-800 ring-leaf-100" : "bg-sun-50 text-sun-800 ring-sun-100",
+        )}
+      >
+        <span className="flex items-center gap-2">
+          <CheckCircle2 className="size-4 shrink-0" />
+          {dipilihList.length ? (
+            <>
+              <span>
+                <span className="font-semibold">{dipilihList.length} baterai dipilih</span> untuk {terpilih.namaDesa} · total{" "}
+                <span className="num font-semibold">{num(kwhDipilih)} kWh</span>
+              </span>
+            </>
+          ) : (
+            <span>
+              Belum ada baterai dipilih. Tekan <span className="font-semibold">Pilih untuk desa ini</span> pada baterai yang cocok.
+            </span>
+          )}
+        </span>
+        {dipilihList.length > 0 && (
+          <span className="flex flex-wrap gap-1.5">
+            {dipilihList.map((r) => (
+              <span key={r.id} className="num rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-leaf-700 ring-1 ring-leaf-200">
+                {r.kode}
+              </span>
+            ))}
+          </span>
+        )}
+      </div>
+
       {!res.ok ? (
         <Notice tone="danger" title="Pencocokan belum dapat dihitung">
           {res.error}
@@ -147,8 +205,10 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
               {hal.rows.map((r) => {
                 const b = detail.get(r.id);
                 const k = kompat.get(r.id);
+                const sudahDipilih = dipilih.has(r.id);
+                const bisaDipilih = r.status === "direkomendasikan" || r.status === "perlu_penyesuaian";
                 return (
-                  <li key={r.id} className="grid gap-4 p-5 sm:p-6 lg:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_auto]">
+                  <li key={r.id} className={cn("grid gap-4 p-5 sm:p-6 lg:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_auto]", sudahDipilih && "bg-leaf-50/60")}>
                     <div className="flex items-start gap-3">
                       <GradeBadge grade={r.status === "belum_dinilai" ? null : b?.gradeTerakhir} />
                       <div className="min-w-0">
@@ -184,7 +244,24 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
                       {k && <p className="mt-2 text-xs text-ink-500">Pemeriksaan kompatibilitas terakhir: {tanggal(k.waktu)}</p>}
                     </div>
 
-                    <div className="flex flex-wrap gap-2 lg:flex-col lg:items-stretch">
+                    <div className="flex flex-wrap gap-2 lg:w-44 lg:flex-col lg:items-stretch">
+                      {(bisaDipilih || sudahDipilih) && (
+                        <form action={pilihBateraiRencana} className="contents">
+                          <input type="hidden" name="rencanaId" value={terpilih.id} />
+                          <input type="hidden" name="bateraiId" value={r.id} />
+                          <SubmitButton size="sm" variant={sudahDipilih ? "secondary" : "primary"} pendingText="Menyimpan…">
+                            {sudahDipilih ? (
+                              <>
+                                <CheckCircle2 className="size-4 text-leaf-600" /> Dipilih · batalkan
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="size-4" /> Pilih untuk desa ini
+                              </>
+                            )}
+                          </SubmitButton>
+                        </form>
+                      )}
                       {r.status === "belum_dinilai" ? (
                         <Link href={`/baterai?q=${encodeURIComponent(b?.kode ?? "")}`} className={buttonClass("secondary", "sm")}>
                           Menunggu assessment pemasok
@@ -194,7 +271,7 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
                           Jalur daur ulang
                         </Link>
                       ) : (
-                        <Link href={`/kompatibilitas?baterai=${r.id}&rencana=${terpilih.id}`} className={buttonClass(k ? "secondary" : "primary", "sm")}>
+                        <Link href={`/kompatibilitas?baterai=${r.id}&rencana=${terpilih.id}`} className={buttonClass("secondary", "sm")}>
                           {k ? "Periksa ulang" : "Cek kompatibilitas"}
                         </Link>
                       )}

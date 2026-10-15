@@ -11,6 +11,7 @@ export function SubmitButton({
   variant = "primary",
   size = "md",
   className,
+  disabled,
   ...rest
 }: ComponentProps<"button"> & {
   pendingText?: string;
@@ -19,7 +20,7 @@ export function SubmitButton({
 }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} aria-busy={pending} className={buttonClass(variant, size, className)} {...rest}>
+    <button type="submit" disabled={pending || disabled} aria-busy={pending} className={buttonClass(variant, size, className)} {...rest}>
       {pending && <LoaderCircle className="size-4 animate-spin" />}
       {pending ? pendingText : children}
     </button>

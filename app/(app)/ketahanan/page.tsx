@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { PageHeader } from "@/components/ui";
+import { Notice, PageHeader } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
-import { num } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { HasilRencana } from "@/lib/types";
 import { Simulator, type SimInitial } from "./simulator";
@@ -12,15 +11,7 @@ export const metadata: Metadata = { title: "Ketahanan Desa" };
 export default async function KetahananPage({ searchParams }: PageProps<"/ketahanan">) {
   await requireAdmin();
   const sp = await searchParams;
-  const [{ data: cfg }, rencana, baterai] = await Promise.all([
-    getActiveConfig(),
-    prisma.rencanaDesa.findMany({ orderBy: { createdAt: "desc" }, take: 30 }),
-    prisma.baterai.findMany({
-      where: { status: "DINILAI", gradeTerakhir: { in: ["A", "B", "C"] } },
-      orderBy: { sohTerakhir: "desc" },
-      select: { id: true, kode: true, merek: true, model: true, sohTerakhir: true, kapasitasAwalKwh: true, gradeTerakhir: true },
-    }),
-  ]);
+  const [{ data: cfg }, rencana] = await Promise.all([getActiveConfig(), prisma.rencanaDesa.findMany({ orderBy: { createdAt: "desc" }, take: 30 })]);
 
   const toInitial = (id: string, nama: string, h: HasilRencana, porsiMalam: number): SimInitial => ({
     rencanaId: id,
@@ -60,11 +51,17 @@ export default async function KetahananPage({ searchParams }: PageProps<"/ketaha
         title="Ketahanan desa"
         description="Berapa lama listrik desa bertahan saat cuaca buruk. Ini simulasi, bukan kendali beban nyata."
       />
+      {sp.diubah && pilihan && (
+        <Notice tone="success" className="mb-4" title="Data rencana diperbarui">
+          Simulasi di bawah sudah memakai data terbaru rencana {pilihan.nama}.
+        </Notice>
+      )}
       <Simulator
+        // Kunci dari data rencana: setelah rencana diubah, simulator mulai ulang dengan data baru.
+        key={JSON.stringify(pilihan ?? plans[0] ?? fallback)}
         initial={pilihan ?? plans[0] ?? fallback}
         plans={plans}
         skenario={Object.entries(cfg.skenario_cuaca).map(([k, v]) => ({ kunci: k, label: v.label, faktor: v.faktor }))}
-        baterai={baterai.map((b) => ({ id: b.id, label: `${b.kode} · ${b.merek} ${b.model} (SoH ${num(b.sohTerakhir)}%, ${b.gradeTerakhir})`, soh: (b.sohTerakhir ?? 70) / 100, kapasitas: b.kapasitasAwalKwh }))}
         defaultPeriode={(cfg as unknown as { periode_simulasi_hari: number }).periode_simulasi_hari}
       />
     </>

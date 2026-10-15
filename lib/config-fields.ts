@@ -1,15 +1,14 @@
 /** Field formulir pengaturan → jalur konfigurasi; persen dikonversi ke fraksi. */
 export type ConfigField = { name: string; path: string; label: string; group: GroupKey; unit?: string; percent?: boolean; min: number; max: number };
 
-export type GroupKey = "penilaian" | "surya" | "baterai" | "biaya" | "genset" | "cuaca";
+export type GroupKey = "penilaian" | "surya" | "baterai" | "biaya" | "cuaca";
 
 /** Urutan, judul, dan penjelasan singkat tiap kelompok parameter. */
 export const CONFIG_GROUPS: { key: GroupKey; title: string; desc: string }[] = [
   { key: "penilaian", title: "Penilaian baterai", desc: "Batas grade dan kapan baterai perlu diganti." },
   { key: "surya", title: "Panel surya", desc: "Produksi listrik panel dan lama sinar matahari per wilayah." },
   { key: "baterai", title: "Baterai", desc: "Nilai awal paket baterai dan batas pemakaian per tujuan." },
-  { key: "biaya", title: "Biaya", desc: "Harga komponen dan solar untuk perbandingan biaya." },
-  { key: "genset", title: "Genset & emisi", desc: "Konversi solar ke listrik dan emisi CO₂." },
+  { key: "biaya", title: "Biaya", desc: "Harga komponen untuk menghitung biaya per rumah." },
   { key: "cuaca", title: "Cuaca & beban", desc: "Produksi surya per cuaca dan urutan beban dimatikan." },
 ];
 
@@ -31,7 +30,6 @@ export const CONFIG_FIELDS: ConfigField[] = [
   { name: "paket_soh", path: "profil_paket.soh", label: "SoH paket umum", group: "baterai", unit: "%", percent: true, min: 1, max: 100 },
   { name: "efisiensi", path: "efisiensi", label: "Efisiensi baterai", group: "baterai", unit: "%", percent: true, min: 10, max: 100 },
   { name: "hari_cadangan", path: "hari_cadangan", label: "Hari cadangan awal", group: "baterai", unit: "hari", min: 0, max: 10 },
-  { name: "dod_hemat", path: "dod_prioritas.hemat_diesel", label: "Batas pakai · hemat diesel", group: "baterai", unit: "%", percent: true, min: 10, max: 100 },
   { name: "dod_tahan", path: "dod_prioritas.ketahanan_maksimum", label: "Batas pakai · ketahanan", group: "baterai", unit: "%", percent: true, min: 10, max: 100 },
   { name: "dod_umur", path: "dod_prioritas.umur_baterai_maksimum", label: "Batas pakai · umur baterai", group: "baterai", unit: "%", percent: true, min: 10, max: 100 },
 
@@ -44,13 +42,8 @@ export const CONFIG_FIELDS: ConfigField[] = [
   { name: "biaya_lain", path: "biaya_lain_persen", label: "Biaya lain (pasang, kabel)", group: "biaya", unit: "%", percent: true, min: 0, max: 100 },
   { name: "umur_sistem", path: "umur_sistem_tahun", label: "Umur sistem", group: "biaya", unit: "tahun", min: 1, max: 40 },
   { name: "perawatan", path: "perawatan_persen_per_tahun", label: "Perawatan per tahun", group: "biaya", unit: "%", percent: true, min: 0, max: 50 },
-  { name: "diesel_rendah", path: "diesel.harga_per_liter_rendah", label: "Solar · terendah", group: "biaya", unit: "Rp/L", min: 0, max: 1e6 },
-  { name: "diesel_tinggi", path: "diesel.harga_per_liter_tinggi", label: "Solar · tertinggi", group: "biaya", unit: "Rp/L", min: 0, max: 1e6 },
 
-  // Genset & emisi
-  { name: "kwh_per_liter", path: "diesel.kwh_per_liter", label: "Listrik per liter solar", group: "genset", unit: "kWh/L", min: 0.5, max: 10 },
-  { name: "emisi", path: "diesel.faktor_emisi_kg_per_liter", label: "Emisi per liter solar", group: "genset", unit: "kg CO₂", min: 0, max: 10 },
-  { name: "genset_kw", path: "diesel.daya_genset_kw", label: "Daya genset", group: "genset", unit: "kW", min: 0.5, max: 1000 },
+  // Nilai solar/genset (diesel.*) dan batas pakai "hemat diesel" tetap ada di konfigurasi untuk mesin hitung, tapi tidak ditampilkan.
 
   // Cuaca & beban
   { name: "sk_normal", path: "skenario_cuaca.normal.faktor", label: "Surya saat normal", group: "cuaca", unit: "%", percent: true, min: 0, max: 100 },

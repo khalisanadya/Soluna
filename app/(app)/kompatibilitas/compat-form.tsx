@@ -3,12 +3,13 @@
 import { useActionState, useRef, useState } from "react";
 import { z } from "zod";
 import { usePathname, useRouter } from "next/navigation";
-import { BatteryCharging, CheckCircle2, CircleAlert, CircleX, Cpu, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { BatteryCharging, CheckCircle2, CircleAlert, CircleX, Cpu, Lock, ShieldCheck } from "lucide-react";
 import { runCompatibility } from "@/app/actions/kompatibilitas";
 import { Pilih } from "@/components/filter-kit";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, Notice, inputClass } from "@/components/ui";
-import { cn } from "@/lib/format";
+import { cn, num } from "@/lib/format";
 import { KOMPAT_FIELDS, kompatSchema, pick } from "@/lib/validation";
 import type { StatusKompat } from "@/lib/types";
 
@@ -28,6 +29,8 @@ export function CompatForm({
   initial,
   bateraiId,
   rencanaId,
+  kunciRencana,
+  dataBaterai,
   daftarBaterai,
   daftarRencana,
   riwayat,
@@ -35,7 +38,9 @@ export function CompatForm({
   initial: Record<string, string>;
   bateraiId: string;
   rencanaId: string;
-  daftarBaterai: { id: string; label: string }[];
+  kunciRencana: boolean;
+  dataBaterai: { kode: string; tegangan: number | null; grade: string | null; soh: number | null; kapasitas: number; paket: number } | null;
+  daftarBaterai: { id: string; label: string; diRencana: boolean }[];
   daftarRencana: { id: string; label: string }[];
   riwayat: React.ReactNode;
 }) {
@@ -59,6 +64,7 @@ export function CompatForm({
     const r = k === "rencana" ? id : rencanaId;
     if (b) q.set("baterai", b);
     if (r) q.set("rencana", r);
+    if (kunciRencana) q.set("kunci", "1");
     router.replace(q.size ? `${pathname}?${q}` : pathname, { scroll: false });
   };
 
@@ -90,11 +96,12 @@ export function CompatForm({
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+    <div className="space-y-4">
       <form
         ref={formRef}
         action={action}
         noValidate
+        className="space-y-4"
         onSubmit={(ev) => {
           // Validasi di peramban dengan aturan yang sama dengan server.
           const r = kompatSchema.safeParse(pick(new FormData(ev.currentTarget), KOMPAT_FIELDS));
@@ -106,157 +113,233 @@ export function CompatForm({
         }}
       >
         {bateraiId && <input type="hidden" name="bateraiId" value={bateraiId} />}
+        {/* Data baterai dari hasil penilaian; server tetap membacanya ulang dari basis data. */}
+        {dataBaterai && (
+          <>
+            <input type="hidden" name="vBaterai" value={dataBaterai.tegangan ?? ""} />
+            <input type="hidden" name="grade" value={dataBaterai.grade ?? ""} />
+            <input type="hidden" name="soh" value={dataBaterai.soh ?? ""} />
+            <input type="hidden" name="kapasitas" value={dataBaterai.kapasitas} />
+            <input type="hidden" name="paket" value={dataBaterai.paket} />
+          </>
+        )}
         {rencanaId && <input type="hidden" name="rencanaId" value={rencanaId} />}
         {jumlahGalat > 0 ? (
-          <Notice tone="danger" className="mb-4" title="Formulir belum lengkap">
-            Periksa {jumlahGalat} kolom yang ditandai merah. Semua kolom wajib diisi.
+          <Notice tone="danger" title="Formulir belum lengkap">
+            Periksa {jumlahGalat} kolom yang ditandai merah.
           </Notice>
         ) : (
-          state?.message && (
-            <Notice tone="danger" className="mb-4">
-              {state.message}
-            </Notice>
-          )
+          state?.message && <Notice tone="danger">{state.message}</Notice>
         )}
-        <Card className="!p-0">
-          {/* Isi otomatis dari data yang sudah ada */}
-          <div className="grid gap-3 border-b border-ink-100 bg-ink-50/60 p-4 sm:grid-cols-2 sm:p-5">
-            <Field label="Baterai" htmlFor="pilih-baterai">
-              <Pilih id="pilih-baterai" value={bateraiId} onChange={(ev) => pilihSumber("baterai", ev.target.value)} className="h-10 text-sm">
-                <option value="">Isi manual</option>
-                {daftarBaterai.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.label}
-                  </option>
-                ))}
-              </Pilih>
-            </Field>
-            <Field label="Rencana desa" htmlFor="pilih-rencana">
-              <Pilih id="pilih-rencana" value={rencanaId} onChange={(ev) => pilihSumber("rencana", ev.target.value)} className="h-10 text-sm">
-                <option value="">Tanpa rencana</option>
-                {daftarRencana.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.label}
-                  </option>
-                ))}
-              </Pilih>
-            </Field>
-          </div>
 
-          {/* Baterai */}
-          <section className="p-4 sm:p-5">
-            <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-900">
-              <BatteryCharging className="size-4 text-leaf-600" /> Baterai
-            </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              {isian("vBaterai", "Tegangan", "V", { placeholder: "51,2" })}
-              <Field label="Grade" htmlFor="grade" error={e.grade} required>
-                <Pilih id="grade" name="grade" defaultValue={v.grade ?? ""} aria-invalid={Boolean(e.grade)} onChange={() => clear("grade")} className="h-10 text-sm">
-                  <option value="" disabled>
-                    Pilih
-                  </option>
-                  {["A", "B", "C", "D"].map((g) => (
-                    <option key={g}>{g}</option>
+        {/* 1 · Apa yang diperiksa */}
+        <Card className="!p-4 sm:!p-5">
+          <Judul n={1} teks="Pilih yang akan diperiksa" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            {kunciRencana ? (
+              <Field label="Rencana desa">
+                <div className="flex h-10 items-center justify-between gap-2 rounded-xl bg-ink-50 px-3.5 text-sm ring-1 ring-ink-200">
+                  <span className="flex min-w-0 items-center gap-2 text-ink-800">
+                    <Lock className="size-3.5 shrink-0 text-ink-400" />
+                    <span className="truncate">{daftarRencana.find((r) => r.id === rencanaId)?.label}</span>
+                  </span>
+                  <Link href={`/perencana/${rencanaId}`} className="shrink-0 text-xs font-semibold text-sun-700 hover:underline">
+                    Kembali
+                  </Link>
+                </div>
+              </Field>
+            ) : (
+              <Field label="Rencana desa" htmlFor="pilih-rencana">
+                <Pilih id="pilih-rencana" value={rencanaId} onChange={(ev) => pilihSumber("rencana", ev.target.value)} className="h-10 text-sm">
+                  <option value="">Tanpa rencana</option>
+                  {daftarRencana.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.label}
+                    </option>
                   ))}
                 </Pilih>
               </Field>
-              {isian("soh", "SoH", "%")}
-              {isian("kapasitas", "Kapasitas", "kWh")}
-              {isian("paket", "Paket", "pkt")}
-            </div>
-          </section>
-
-          {/* Inverter */}
-          <section className="border-t border-ink-100 p-4 sm:p-5">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-                <Cpu className="size-4 text-sky-600" /> Inverter
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {PRESET.map((p) => (
-                  <button type="button" key={p.t} onClick={() => applyPreset(p)} className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700 hover:bg-ink-200">
-                    {p.t}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              {isian("vNominal", "Nominal", "V")}
-              {isian("vMin", "Minimum", "V")}
-              {isian("vMaks", "Maksimum", "V")}
-              {isian("kwInverter", "Daya", "kW")}
-              {isian("kwPuncak", "Beban puncak", "kW")}
-            </div>
-          </section>
-
-          <div className="flex items-center justify-between gap-3 border-t border-ink-100 bg-canvas/60 px-4 py-3 sm:px-5">
-            <p className="text-xs text-ink-500">
-              <span className="text-flame-500">*</span> Semua kolom wajib diisi.
-            </p>
-            <SubmitButton pendingText="Memeriksa…">
-              <ShieldCheck className="size-4" /> Periksa
-            </SubmitButton>
+            )}
+            <Field label="Baterai" htmlFor="pilih-baterai" required error={e.bateraiId}>
+              <Pilih id="pilih-baterai" value={bateraiId} onChange={(ev) => pilihSumber("baterai", ev.target.value)} className="h-10 text-sm">
+                <option value="" disabled>
+                  Pilih baterai…
+                </option>
+                {daftarBaterai.some((b) => b.diRencana) && (
+                  <optgroup label="Dipilih untuk rencana ini">
+                    {daftarBaterai
+                      .filter((b) => b.diRencana)
+                      .map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
+                <optgroup label={daftarBaterai.some((b) => b.diRencana) ? "Baterai lain" : "Baterai yang sudah dinilai"}>
+                  {daftarBaterai
+                    .filter((b) => !b.diRencana)
+                    .map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.label}
+                      </option>
+                    ))}
+                </optgroup>
+              </Pilih>
+            </Field>
           </div>
         </Card>
+
+        {/* 2 · Baterai dan inverter berdampingan, dengan baris yang setara */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="!p-4 sm:!p-5">
+            <Judul n={2} teks="Data baterai" icon={<BatteryCharging className="size-4 text-leaf-600" />} ket="Otomatis dari hasil penilaian" />
+            {dataBaterai ? (
+              <>
+                <Kelompok judul="Tegangan">
+                  <Nilai label="Tegangan baterai" nilai={dataBaterai.tegangan ? `${num(dataBaterai.tegangan)} V` : "Belum ada"} salah={!dataBaterai.tegangan} />
+                </Kelompok>
+                <Kelompok judul="Kapasitas & kondisi">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Nilai label="Kapasitas" nilai={`${num(dataBaterai.kapasitas)} kWh`} />
+                    <Nilai label="Jumlah paket" nilai={`${dataBaterai.paket} paket`} />
+                    <Nilai label="Grade" nilai={dataBaterai.grade ?? "—"} />
+                    <Nilai label="SoH" nilai={dataBaterai.soh !== null ? `${num(dataBaterai.soh)}%` : "—"} />
+                  </div>
+                </Kelompok>
+                <p className="mt-3 text-xs text-ink-400">
+                  Dari penilaian {dataBaterai.kode}
+                  {rencanaId ? "; jumlah paket dari rencana desa" : ""}. Tidak bisa diubah.
+                </p>
+                {!dataBaterai.tegangan && (
+                  <Notice tone="warning" className="mt-3">
+                    Tegangan baterai belum diisi pemasok, jadi belum bisa diperiksa.
+                  </Notice>
+                )}
+              </>
+            ) : (
+              <p className="rounded-xl bg-ink-50 px-3 py-6 text-center text-sm text-ink-500">Pilih baterai di langkah 1. Datanya terisi otomatis.</p>
+            )}
+          </Card>
+
+          <Card className="!p-4 sm:!p-5">
+            <Judul n={3} teks="Data inverter" icon={<Cpu className="size-4 text-sky-600" />} ket="Alat yang akan dipasang" />
+            <Kelompok
+              judul="Tegangan yang diterima"
+              aksi={
+                <div className="flex flex-wrap gap-1">
+                  {PRESET.map((p) => (
+                    <button type="button" key={p.t} onClick={() => applyPreset(p)} className="rounded-full bg-ink-100 px-2 py-0.5 text-[0.7rem] font-medium text-ink-700 hover:bg-ink-200">
+                      {p.t}
+                    </button>
+                  ))}
+                </div>
+              }
+            >
+              <div className="grid grid-cols-3 gap-2">
+                {isian("vNominal", "Nominal", "V")}
+                {isian("vMin", "Minimum", "V")}
+                {isian("vMaks", "Maksimum", "V")}
+              </div>
+            </Kelompok>
+            <Kelompok judul="Daya">
+              <div className="grid grid-cols-2 gap-2">
+                {isian("kwInverter", "Daya inverter", "kW")}
+                {isian("kwPuncak", "Beban puncak desa", "kW")}
+              </div>
+            </Kelompok>
+            {rencanaId && <p className="mt-3 text-xs text-ink-400">Daya dan beban puncak terisi dari rencana desa.</p>}
+          </Card>
+        </div>
+
+        {/* Tombol periksa */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] bg-surface px-4 py-3 shadow-soft ring-1 ring-ink-200/60 sm:px-5">
+          <p className="text-xs text-ink-500">Diperiksa: tegangan baterai cocok dengan inverter, daya cukup untuk beban puncak, dan kondisi baterai layak.</p>
+          <SubmitButton pendingText="Memeriksa…" disabled={!dataBaterai?.tegangan}>
+            <ShieldCheck className="size-4" /> Periksa kecocokan
+          </SubmitButton>
+        </div>
       </form>
 
-      {/* Hasil + riwayat berdampingan dengan form */}
-      <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-        {h ? (
-          <Card className={cn("!p-4 ring-1", STYLE[h.status].soft)}>
-            <div className="flex items-center gap-3">
-              {(() => {
-                const S = STYLE[h.status];
-                return (
-                  <span className={cn("grid size-12 shrink-0 place-items-center rounded-2xl text-white", S.bg)}>
-                    <S.icon className="size-6" />
-                  </span>
-                );
-              })()}
-              <div>
-                <p className="text-xs text-ink-500">Hasil pemeriksaan</p>
-                <p className={cn("text-xl font-bold", STYLE[h.status].text)}>{h.label}</p>
-              </div>
-            </div>
-            <ul className="mt-4 space-y-2.5">
-              {h.pemeriksaan.map((p) => {
-                const S = STYLE[p.status];
-                return (
-                  <li key={p.nama} className="flex gap-2.5 rounded-xl bg-surface p-3 text-sm">
-                    <S.icon className={cn("mt-0.5 size-4 shrink-0", S.text)} />
-                    <span className="min-w-0">
-                      <span className="block font-semibold text-ink-900">{p.nama}</span>
-                      <span className="mt-0.5 block text-xs leading-relaxed text-ink-600">{p.alasan}</span>
+      {/* 4 · Hasil (selebar penuh), riwayat di bawahnya */}
+      <div className="space-y-4">
+        <div>
+          {h ? (
+            <Card className={cn("!p-4 ring-1 sm:!p-5", STYLE[h.status].soft)}>
+              <div className="flex items-center gap-3">
+                {(() => {
+                  const S = STYLE[h.status];
+                  return (
+                    <span className={cn("grid size-12 shrink-0 place-items-center rounded-2xl text-white", S.bg)}>
+                      <S.icon className="size-6" />
                     </span>
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="mt-3 text-xs text-ink-500">Tersimpan di riwayat{bateraiId ? " dan paspor baterai" : ""}. Hasil indikatif, bukan sertifikasi.</p>
-          </Card>
-        ) : (
-          <Card className="!p-4">
-            <p className="text-sm font-semibold text-ink-900">Yang diperiksa</p>
-            <ul className="mt-3 space-y-2.5 text-sm text-ink-600">
-              {[
-                ["Tegangan", "Tegangan baterai masuk rentang inverter"],
-                ["Daya", "Inverter dan baterai sanggup menahan beban puncak"],
-                ["Kondisi baterai", "Grade menentukan cara pakai; grade D tidak dipasang"],
-              ].map(([t, d]) => (
-                <li key={t} className="flex gap-2.5">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ink-300" />
-                  <span>
-                    <span className="font-medium text-ink-800">{t}</span>
-                    <span className="block text-xs text-ink-500">{d}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 rounded-xl bg-ink-50 px-3 py-2 text-xs text-ink-500">Hasil: Layak, Perlu penyesuaian, atau Tidak layak, beserta alasannya.</p>
-          </Card>
-        )}
-        {riwayat}
+                  );
+                })()}
+                <div>
+                  <p className="text-xs text-ink-500">Hasil pemeriksaan{dataBaterai ? ` · ${dataBaterai.kode}` : ""}</p>
+                  <p className={cn("text-xl font-bold", STYLE[h.status].text)}>{h.label}</p>
+                </div>
+              </div>
+              <ul className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                {h.pemeriksaan.map((p) => {
+                  const S = STYLE[p.status];
+                  return (
+                    <li key={p.nama} className="flex gap-2.5 rounded-xl bg-surface p-3 text-sm">
+                      <S.icon className={cn("mt-0.5 size-4 shrink-0", S.text)} />
+                      <span className="min-w-0">
+                        <span className="block font-semibold text-ink-900">{p.nama}</span>
+                        <span className="mt-0.5 block text-xs leading-relaxed text-ink-600">{p.alasan}</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="mt-3 text-xs text-ink-500">Tersimpan di riwayat{rencanaId ? " dan langkah berikutnya rencana desa" : ""}. Hasil indikatif, bukan sertifikasi.</p>
+            </Card>
+          ) : (
+            <Card className="flex flex-col justify-center !p-5 text-center">
+              <ShieldCheck className="mx-auto size-8 text-ink-300" />
+              <p className="mt-2 text-sm font-semibold text-ink-800">Hasil muncul di sini</p>
+              <p className="mt-1 text-xs text-ink-500">Tekan &ldquo;Periksa kecocokan&rdquo;. Hasilnya: Layak, Perlu penyesuaian, atau Tidak layak, beserta alasannya.</p>
+            </Card>
+          )}
+        </div>
+        <div>{riwayat}</div>
       </div>
+    </div>
+  );
+}
+
+function Judul({ n, teks, icon, ket }: { n: number; teks: string; icon?: React.ReactNode; ket?: string }) {
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <span className="num grid size-6 shrink-0 place-items-center rounded-full bg-ink-900 text-xs text-white">{n}</span>
+      <span className="flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+        {icon}
+        {teks}
+      </span>
+      {ket && <span className="ml-auto text-xs text-ink-400">{ket}</span>}
+    </div>
+  );
+}
+
+function Kelompok({ judul, aksi, children }: { judul: string; aksi?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="mt-3 first:mt-0">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-ink-500">{judul}</p>
+        {aksi}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Nilai({ label, nilai, salah }: { label: string; nilai: string; salah?: boolean }) {
+  return (
+    <div className="rounded-xl bg-ink-50 px-3 py-2 ring-1 ring-ink-100">
+      <p className="text-[0.7rem] text-ink-500">{label}</p>
+      <p className={cn("num text-sm font-semibold", salah ? "text-flame-600" : "text-ink-900")}>{nilai}</p>
     </div>
   );
 }

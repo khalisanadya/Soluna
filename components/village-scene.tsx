@@ -11,7 +11,6 @@ import { cn, num } from "@/lib/format";
    1. Surya dipakai lebih dulu untuk beban desa; sisanya mengisi baterai (maks. 5 kW).
    2. Kekurangan ditutup baterai.
    3. Bila SoC < 35% dan surya tidak cukup, beban kenyamanan dilepas; beban kritis tetap menyala.
-   4. Bila SoC ≤ 20% dan masih kurang, genset cadangan menyala; mati lagi saat SoC ≥ 45%.
    ===================================================================================== */
 
 type Cuaca = "cerah" | "berawan" | "hujan" | "malam";
@@ -54,9 +53,8 @@ function hitung({ cuaca, soc, genset }: Sim): Aliran {
   const kurang = beban - suryaKeBeban;
   const surplus = surya - suryaKeBeban;
 
-  let on = genset;
-  if (on && (soc >= 45 || kurang === 0)) on = false;
-  if (!on && kurang > 0 && soc <= 20) on = true;
+  // Ilustrasi hanya surya + baterai: tidak ada sumber cadangan lain.
+  const on = genset && false;
 
   const gensetKeBeban = on ? Math.min(GENSET_KW, kurang) : 0;
   const ruangIsi = soc < 99.5 ? LADEN_MAKS : 0;
@@ -113,7 +111,7 @@ function tint(hex: string, k: number) {
 
 const ENERGI = { surya: "#fa9104", baterai: "#1f9165", genset: "#d9533b" } as const;
 
-type Target = "matahari" | "panel" | "baterai" | "rumah" | "genset";
+type Target = "matahari" | "panel" | "baterai" | "rumah";
 
 type HoverHandlers = {
   onPointerEnter: (e: React.PointerEvent) => void;
@@ -131,7 +129,6 @@ const WARGA = [
 ];
 const BATERAI = { x0: 268, y0: 134, x1: 300, y1: 182, h: 52 };
 const HUB = { x0: 268, y0: 214, x1: 286, y1: 230, h: 30 };
-const GENSET = { x0: 300, y0: 292, x1: 352, y1: 330, h: 30 };
 const POHON: V3[] = [
   [22, 24],
   [372, 128],
@@ -231,7 +228,6 @@ export function VillageScene({ className }: { className?: string }) {
       kw: Math.abs(f.netBaterai),
       colors: f.netBaterai >= 0 ? [f.gensetKeBaterai > f.suryaKeBaterai ? ENERGI.genset : ENERGI.surya] : [ENERGI.baterai],
     },
-    { key: "gen", path: JALUR.gensetKeHub, kw: f.genset ? GENSET_KW : 0, colors: [ENERGI.genset] },
     { key: "rumah", path: JALUR.hubKeRumah, kw: f.beban, colors: sumberBeban },
     { key: "w1", path: JALUR.hubKeW1, kw: f.beban * 0.6, colors: sumberBeban },
     { key: "w2", path: JALUR.hubKeW2, kw: f.beban * 0.6, colors: sumberBeban },
@@ -291,7 +287,7 @@ export function VillageScene({ className }: { className?: string }) {
           viewBox="0 0 800 580"
           className="relative block h-auto w-full select-none"
           role="img"
-          aria-label={`Ilustrasi sistem energi desa, cuaca ${CUACA[sim.cuaca].label.toLowerCase()}: surya ${num(f.surya)} kW, baterai ${num(sim.soc, 0)}%, beban desa ${num(f.beban)} kW, genset ${f.genset ? "menyala" : "siaga"}.`}
+          aria-label={`Ilustrasi sistem energi desa, cuaca ${CUACA[sim.cuaca].label.toLowerCase()}: surya ${num(f.surya)} kW, baterai ${num(sim.soc, 0)}%, beban desa ${num(f.beban)} kW.`}
         >
           <defs>
             <radialGradient id="vs-sun" cx="0.4" cy="0.35">
@@ -444,11 +440,6 @@ export function VillageScene({ className }: { className?: string }) {
             <Tree key={`a${i}`} at={p} k={k} i={i} />
           ))}
 
-          {/* Genset */}
-          <g {...hoverProps("genset")} className="origin-self" style={{ ...lift(active === "genset", 1.06), filter: glow("genset"), cursor: "pointer" }}>
-            <GensetShape k={k} on={f.genset} reduced={reduced} />
-          </g>
-
           {POHON.filter(([x, y]) => x + y >= 300).map((p, i) => (
             <Tree key={`b${i}`} at={p} k={k} i={i + 3} />
           ))}
@@ -527,17 +518,6 @@ function describe(t: Target | null, sim: Sim, f: Aliran): Info | null {
           ? "Baterai di bawah 35%: beban kenyamanan dilepas agar beban kritis tetap menyala."
           : "Jendela menyala berarti rumah mendapat listrik.",
       };
-    case "genset":
-      return {
-        title: `Genset diesel · ${num(GENSET_KW)} kW`,
-        tone: ENERGI.genset,
-        rows: [
-          ["Status", f.genset ? "Menyala" : "Siaga"],
-          ["Ke rumah", `${num(f.gensetKeBeban)} kW`],
-          ["Ke baterai", `${num(f.gensetKeBaterai)} kW`],
-        ],
-        note: "Sumber cadangan: menyala otomatis bila baterai ≤ 20% dan surya tidak cukup, mati lagi saat baterai ≥ 45%.",
-      };
   }
 }
 
@@ -549,7 +529,6 @@ const ANCHOR: Record<Target, Anchor> = {
   panel: { at: P([196, 150, 92]), side: "left" },
   baterai: { at: P([284, 134, 58]), side: "above" },
   rumah: { at: P([120, 250, 60]), side: "left" },
-  genset: { at: P([300, 300, 30]), side: "left" },
 };
 const RUMAH_ANCHOR: Record<string, Anchor> = {
   utama: ANCHOR.rumah,
@@ -849,30 +828,6 @@ function BatteryShape({ k, soc, mode }: { k: number; soc: number; mode: "mengisi
       <polygon points={pts([x1, y0 + 15, 9], [x1, y0 + 29, 9], [x1, y0 + 29, fillH], [x1, y0 + 15, fillH])} fill={color} style={{ transition: "all .8s" }} />
       {/* LED status */}
       <circle cx={P([x1, y0 + 40, h - 8])[0]} cy={P([x1, y0 + 40, h - 8])[1]} r="2.6" fill={mode === "mengisi" ? "#e1ee5e" : mode === "memasok" ? "#ffcf73" : "#cfd6dc"} className={mode !== "siaga" ? "animate-pulse-soft" : undefined} />
-    </g>
-  );
-}
-
-function GensetShape({ k, on, reduced }: { k: number; on: boolean; reduced: boolean }) {
-  const { x0, y0, x1, y1, h } = GENSET;
-  const [ex, ey] = P([x1 - 12, y0 + 10, h + 14]);
-  return (
-    <g>
-      <polygon points={pts([x0 - 4, y0 - 4, 0], [x1 + 4, y0 - 4, 0], [x1 + 4, y1 + 4, 0], [x0 - 4, y1 + 4, 0])} fill={tint("#c9c3b4", k)} />
-      <Box x0={x0} y0={y0} x1={x1} y1={y1} h={h} top="#b8b3a8" left="#6b675f" right="#8f8a80" k={k} />
-      <polygon points={pts([x0, y1, h - 9], [x1, y1, h - 9], [x1, y1, h - 5], [x0, y1, h - 5])} fill={tint("#d9533b", k)} />
-      {/* kisi ventilasi */}
-      {[0, 1, 2, 3].map((i) => (
-        <path key={i} d={line([x1, y0 + 8 + i * 6, 8], [x1, y0 + 8 + i * 6, 18])} stroke="rgb(0 0 0 / 0.25)" strokeWidth="1.5" />
-      ))}
-      <circle cx={P([x0 + 8, y1, 14])[0]} cy={P([x0 + 8, y1, 14])[1]} r="2.6" fill={on ? "#7ee2a8" : "#5b5850"} className={on ? "animate-pulse-soft" : undefined} />
-      {/* knalpot + asap saat menyala */}
-      <path d={line([x1 - 12, y0 + 10, h], [x1 - 12, y0 + 10, h + 14])} stroke={tint("#4a4744", k)} strokeWidth="4" strokeLinecap="round" />
-      {on &&
-        !reduced &&
-        [0, 1, 2].map((i) => (
-          <circle key={i} cx={ex} cy={ey - 4} r="5" fill="#cfcac0" className="origin-self animate-puff" style={{ animationDelay: `${i * 0.7}s` }} />
-        ))}
     </g>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ArrowLeft, ArrowRight, BatteryCharging, Check, CircleAlert, Fuel, Home, Info as InfoIcon, Loader2, Pencil, ShieldCheck, Sprout, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, BatteryCharging, Check, CircleAlert, Home, Info as InfoIcon, Loader2, Minus, Pencil, Plus, ShieldCheck, Sprout, Zap } from "lucide-react";
 import { runPlan } from "@/app/actions/perencana";
 import { Pilih } from "@/components/filter-kit";
 import { SubmitButton } from "@/components/submit-button";
@@ -12,7 +12,7 @@ import { cn, num, umur } from "@/lib/format";
 import { RENCANA_FIELDS, pick, validasiRencana } from "@/lib/validation";
 import type { Prioritas } from "@/lib/types";
 
-export type PlanDefaults = { kapasitasPaket: number; sohPaket: number; hariCadangan: number; hargaSolarMin: number; hargaSolarMaks: number };
+export type PlanDefaults = { kapasitasPaket: number; sohPaket: number; hariCadangan: number };
 
 export type BateraiPilihan = {
   id: string;
@@ -28,15 +28,14 @@ export type BateraiPilihan = {
 };
 
 const LANGKAH = [
-  { judul: "Desa", fields: ["namaDesa", "nama", "lokasi", "jumlahRumah"] },
+  { judul: "Desa", fields: ["namaDesa", "lokasi", "jumlahRumah"] },
   { judul: "Kebutuhan listrik", fields: ["konsumsi", "porsiMalam"] },
   { judul: "Baterai", fields: ["sumberPaket", "bateraiId", "kapasitasPaket", "sohPaket"] },
-  { judul: "Tujuan & biaya", fields: ["prioritas", "hariCadangan", "hargaSolarMin", "hargaSolarMaks", "periode"] },
+  { judul: "Tujuan", fields: ["prioritas", "hariCadangan"] },
   { judul: "Ringkasan", fields: [] },
 ] as const satisfies { judul: string; fields: readonly string[] }[];
 
 const PRIORITAS: { k: Prioritas; t: string; d: string; icon: React.ReactNode; warna: string }[] = [
-  { k: "hemat_diesel", t: "Hemat diesel", d: "Kurangi pemakaian solar genset.", icon: <Fuel className="size-5" />, warna: "bg-sun-100 text-sun-700" },
   { k: "ketahanan_maksimum", t: "Ketahanan maksimum", d: "Listrik tetap menyala saat mendung.", icon: <ShieldCheck className="size-5" />, warna: "bg-sky-50 text-sky-600" },
   { k: "umur_baterai_maksimum", t: "Umur baterai maksimum", d: "Baterai lebih awet dipakai.", icon: <Sprout className="size-5" />, warna: "bg-leaf-50 text-leaf-600" },
 ];
@@ -48,32 +47,38 @@ export function PlanForm({
   baterai,
   defaults,
   dodPrioritas,
+  ubah,
 }: {
   lokasi: { nama: string; psh: number }[];
   baterai: BateraiPilihan[];
   defaults: PlanDefaults;
   dodPrioritas: Record<Prioritas, number>;
+  /** Mode ubah: rencana yang diubah, isian awalnya, dan tujuan setelah selesai/batal. */
+  ubah?: { rencanaId: string; awal: Record<string, string>; kembali: "rencana" | "ketahanan"; batal: string };
 }) {
   const [state, action] = useActionState(runPlan, undefined);
   const formRef = useRef<HTMLFormElement>(null);
   const [dirty, setDirty] = useState(false);
   const [step, setStep] = useState(0);
-  const [maks, setMaks] = useState(0);
+  // Saat mengubah, semua langkah sudah pernah diisi sehingga bisa langsung dibuka.
+  const [maks, setMaks] = useState(ubah ? 4 : 0);
   const [clientErrors, setClientErrors] = useState<Record<string, string[] | undefined>>({});
   const [isian, setIsian] = useState<Record<string, string>>({});
   const { leave, dialog, lepas } = useUnsavedGuard(dirty);
-  const v: Record<string, string | undefined> = state?.values ?? {};
+  const v: Record<string, string | undefined> = { ...ubah?.awal, ...state?.values };
   const e = { ...state?.errors, ...clientErrors };
   const err = (name: string) => e[name];
 
-  const tersedia = baterai.filter((b) => !b.diblokir);
   const [lok, setLok] = useState(v.lokasi ?? "Bawaan");
-  const [sumber, setSumber] = useState<"bawaan" | "baterai">((v.sumberPaket as "baterai") ?? (tersedia.length ? "baterai" : "bawaan"));
-  const [bateraiId, setBateraiId] = useState(v.bateraiId ?? "");
-  const [prioritas, setPrioritas] = useState<Prioritas>((v.prioritas as Prioritas) ?? "hemat_diesel");
+  // Baterai wajib dipilih dari daftar baterai yang sudah dinilai (tidak ada isian manual).
+  const sumber = "baterai";
+  // Boleh lebih dari satu baterai; dikirim sebagai daftar id dipisah koma.
+  const [bateraiIds, setBateraiIds] = useState<string[]>(() => (v.bateraiId ? v.bateraiId.split(",").filter(Boolean) : []));
+  const [prioritas, setPrioritas] = useState<Prioritas>((v.prioritas as Prioritas) ?? "ketahanan_maksimum");
   const [cadangan, setCadangan] = useState(v.hariCadangan ?? String(defaults.hariCadangan));
   const psh = lokasi.find((l) => l.nama === lok)?.psh;
-  const terpilih = baterai.find((b) => b.id === bateraiId);
+  const terpilihList = baterai.filter((b) => bateraiIds.includes(b.id));
+  const kwhTerpilih = terpilihList.reduce((n, b) => n + b.kapasitas, 0);
 
   // Galat dari server: buka langkah pertama yang bermasalah.
   useEffect(() => {
@@ -167,6 +172,12 @@ export function PlanForm({
         lepas();
       }}
     >
+      {ubah && (
+        <>
+          <input type="hidden" name="rencanaId" value={ubah.rencanaId} />
+          <input type="hidden" name="kembali" value={ubah.kembali} />
+        </>
+      )}
       {/* Indikator langkah */}
       <ol className="mb-4 grid grid-cols-5 gap-1.5 sm:gap-3" aria-label="Langkah perencanaan">
         {LANGKAH.map((l, i) => {
@@ -207,9 +218,6 @@ export function PlanForm({
             <Field label="Nama desa" htmlFor="namaDesa" error={err("namaDesa")} required>
               <input id="namaDesa" name="namaDesa" defaultValue={v.namaDesa} placeholder="mis. Desa Sukamaju" autoComplete="off" aria-invalid={Boolean(err("namaDesa"))} onChange={() => clear("namaDesa")} className={inputClass} />
             </Field>
-            <Field label="Nama rencana" htmlFor="nama" error={err("nama")} optional>
-              <input id="nama" name="nama" defaultValue={v.nama} placeholder="mis. Tahap 1" autoComplete="off" aria-invalid={Boolean(err("nama"))} onChange={() => clear("nama")} className={inputClass} />
-            </Field>
             <Field label="Jumlah rumah" htmlFor="jumlahRumah" error={err("jumlahRumah")} required>
               {angka("jumlahRumah", "rumah", undefined, { inputMode: "numeric", placeholder: "50" })}
             </Field>
@@ -241,52 +249,39 @@ export function PlanForm({
         </Langkah>
 
         {/* Langkah 3 — Baterai */}
-        <Langkah aktif={step === 2} icon={<BatteryCharging className="size-5" />} judul="Baterai" keterangan="Pilih baterai bekas yang sudah dinilai.">
+        <Langkah aktif={step === 2} icon={<BatteryCharging className="size-5" />} judul="Baterai" keterangan="Pilih satu atau beberapa baterai bekas yang sudah dinilai.">
           <input type="hidden" name="sumberPaket" value={sumber} />
-          <input type="hidden" name="bateraiId" value={sumber === "baterai" ? bateraiId : ""} />
-          {err("bateraiId") && sumber === "baterai" && (
+          <input type="hidden" name="bateraiId" value={bateraiIds.join(",")} />
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ink-50 px-3 py-2 text-sm ring-1 ring-ink-100">
+            <span className="text-ink-600">
+              {terpilihList.length ? (
+                <>
+                  <span className="font-semibold text-ink-900">{terpilihList.length} baterai dipilih</span> · total{" "}
+                  <span className="num font-semibold text-ink-900">{num(kwhTerpilih)} kWh</span>
+                </>
+              ) : (
+                "Centang baterai yang akan dipakai. Boleh lebih dari satu."
+              )}
+            </span>
+            {terpilihList.length > 0 && (
+              <button type="button" onClick={() => setBateraiIds([])} className="text-xs font-semibold text-ink-500 hover:text-ink-900">
+                Hapus pilihan
+              </button>
+            )}
+          </div>
+          {err("bateraiId") && (
             <p className="mb-2 flex items-center gap-1 text-xs font-medium text-flame-600">
               <CircleAlert className="size-3.5" /> {err("bateraiId")![0]}
             </p>
           )}
 
-          <div className="overflow-hidden rounded-2xl ring-1 ring-ink-200" role="radiogroup" aria-label="Baterai">
+          <div className="overflow-hidden rounded-2xl ring-1 ring-ink-200" role="group" aria-label="Baterai">
             <ul className="divide-y divide-ink-100">
-              {/* Pilihan pertama: isi data baterai sendiri (tetap terlihat tanpa menggulir). */}
-              <li>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={sumber === "bawaan"}
-                  onClick={() => {
-                    setSumber("bawaan");
-                    setDirty(true);
-                    setClientErrors((p) => ({ ...p, bateraiId: undefined }));
-                  }}
-                  className={cn("flex w-full items-center gap-3 px-4 py-3 text-left transition", sumber === "bawaan" ? "bg-sun-50" : "hover:bg-ink-50")}
-                >
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-ink-100 text-ink-500">
-                    <Pencil className="size-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-ink-900">Isi manual</span>
-                    <span className="block text-xs text-ink-500">{baterai.length ? "Isi kapasitas dan SoH sendiri bila baterai tidak ada di daftar" : "Belum ada baterai yang dinilai"}</span>
-                  </span>
-                  <span className={cn("grid size-5 place-items-center rounded-full ring-2", sumber === "bawaan" ? "ring-sun-500" : "ring-ink-300")} aria-hidden="true">
-                    {sumber === "bawaan" && <span className="size-2.5 rounded-full bg-sun-500" />}
-                  </span>
-                </button>
-                {sumber === "bawaan" && (
-                  <div className="grid gap-4 border-t border-ink-100 bg-sun-50/50 px-4 py-4 sm:grid-cols-2">
-                    <Field label="Kapasitas per paket" htmlFor="kapasitasPaket" error={err("kapasitasPaket")} required>
-                      {angka("kapasitasPaket", "kWh", undefined, { placeholder: `mis. ${defaults.kapasitasPaket}` })}
-                    </Field>
-                    <Field label="Kesehatan (SoH)" htmlFor="sohPaket" error={err("sohPaket")} required>
-                      {angka("sohPaket", "%", undefined, { placeholder: `mis. ${defaults.sohPaket}` })}
-                    </Field>
-                  </div>
-                )}
-              </li>
+              {baterai.length === 0 && (
+                <li className="px-4 py-6 text-center text-sm text-ink-500">
+                  Belum ada baterai yang sudah dinilai. Rencana bisa dibuat setelah pemasok menilai baterainya.
+                </li>
+              )}
               {baterai.length > 0 && (
                 <li className="hidden grid-cols-[2.5rem_minmax(0,1fr)_6rem_6rem_7rem_9rem_1.5rem] items-center gap-3 bg-ink-50 px-4 py-2.5 text-xs font-medium text-ink-500 md:grid" aria-hidden="true">
                   <span>Grade</span>
@@ -301,18 +296,17 @@ export function PlanForm({
                 </li>
               )}
               {baterai.map((b) => {
-                const aktif = sumber === "baterai" && bateraiId === b.id;
+                const aktif = bateraiIds.includes(b.id);
                 return (
                   <li key={b.id}>
                     <button
                       type="button"
-                      role="radio"
+                      role="checkbox"
                       aria-checked={aktif}
                       disabled={Boolean(b.diblokir)}
                       title={b.diblokir ?? undefined}
                       onClick={() => {
-                        setSumber("baterai");
-                        setBateraiId(b.id);
+                        setBateraiIds((ids) => (ids.includes(b.id) ? ids.filter((x) => x !== b.id) : [...ids, b.id]));
                         clear("bateraiId");
                       }}
                       className={cn(
@@ -341,8 +335,8 @@ export function PlanForm({
                           {b.diblokir ? "Tidak layak" : (b.kompat?.label ?? "Belum dicek")}
                         </Badge>
                       </span>
-                      <span className={cn("grid size-5 place-items-center rounded-full ring-2", aktif ? "ring-sun-500" : "ring-ink-300")} aria-hidden="true">
-                        {aktif && <span className="size-2.5 rounded-full bg-sun-500" />}
+                      <span className={cn("grid size-5 place-items-center rounded-md ring-2", aktif ? "bg-sun-500 text-ink-950 ring-sun-500" : "ring-ink-300")} aria-hidden="true">
+                        {aktif && <Check className="size-3.5" strokeWidth={3} />}
                       </span>
                     </button>
                   </li>
@@ -353,10 +347,10 @@ export function PlanForm({
           </div>
         </Langkah>
 
-        {/* Langkah 4 — Tujuan & biaya */}
-        <Langkah aktif={step === 3} icon={<ShieldCheck className="size-5" />} judul="Tujuan & biaya" keterangan="Pilih yang paling penting untuk desa.">
+        {/* Langkah 4 — Tujuan */}
+        <Langkah aktif={step === 3} icon={<ShieldCheck className="size-5" />} judul="Tujuan" keterangan="Pilih yang paling penting untuk desa.">
           <input type="hidden" name="prioritas" value={prioritas} />
-          <div className="grid gap-3 md:grid-cols-3" role="radiogroup" aria-label="Tujuan perencanaan">
+          <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Tujuan perencanaan">
             {PRIORITAS.map((p) => {
               const aktif = prioritas === p.k;
               return (
@@ -382,55 +376,70 @@ export function PlanForm({
             })}
           </div>
 
-          <div className="mt-6">
-            <p className="mb-2 text-sm font-medium text-ink-800">
-              Cadangan saat mendung <span className="text-flame-500">*</span>
-            </p>
-            <input type="hidden" name="hariCadangan" value={cadangan} />
-            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Hari cadangan">
-              {["0", "1", "2", "3"].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  role="radio"
-                  aria-checked={cadangan === n}
-                  onClick={() => (setCadangan(n), setDirty(true))}
-                  className={cn("h-9 rounded-full px-4 text-sm font-medium ring-1 transition", cadangan === n ? "bg-ink-900 text-white ring-ink-900" : "bg-surface text-ink-700 ring-ink-200 hover:bg-ink-50")}
-                >
-                  {n === "0" ? "Tanpa cadangan" : `${n} hari`}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="mt-6 border-t border-ink-100 pt-5">
             <p className="text-sm font-medium text-ink-800">
-              Bandingkan dengan genset diesel <span className="text-xs font-normal text-ink-400">opsional</span>
+              Berapa hari listrik harus tetap menyala tanpa matahari? <span className="text-flame-500">*</span>
             </p>
-            <p className="mb-3 text-xs text-ink-500">
-              Isi harga solar di desa untuk melihat mana yang lebih murah. Kosongkan untuk memakai harga standar Rp{num(defaults.hargaSolarMin, 0)}–{num(defaults.hargaSolarMaks, 0)}.
-            </p>
-            <div className="grid gap-5 sm:grid-cols-3">
-              <Field label="Harga solar terendah" htmlFor="hargaSolarMin" error={err("hargaSolarMin")}>
-                {angka("hargaSolarMin", "Rp/liter", undefined, { inputMode: "numeric", placeholder: String(defaults.hargaSolarMin) })}
-              </Field>
-              <Field label="Harga solar tertinggi" htmlFor="hargaSolarMaks" error={err("hargaSolarMaks")}>
-                {angka("hargaSolarMaks", "Rp/liter", undefined, { inputMode: "numeric", placeholder: String(defaults.hargaSolarMaks) })}
-              </Field>
-              <Field label="Bandingkan biaya" htmlFor="periode" error={err("periode")}>
-                <Pilih id="periode" name="periode" defaultValue={v.periode ?? "30"}>
-                  <option value="30">Per bulan</option>
-                  <option value="365">Per tahun</option>
-                </Pilih>
-              </Field>
+            <p className="mb-3 text-xs text-ink-500">Untuk hari mendung atau hujan berturut-turut.</p>
+            <input type="hidden" name="hariCadangan" value={cadangan} />
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Penghitung hari: − nilai + (0–10) */}
+              <div className="inline-flex items-center rounded-full bg-surface p-1 ring-1 ring-ink-200" role="group" aria-label="Jumlah hari cadangan">
+                <button
+                  type="button"
+                  aria-label="Kurangi satu hari"
+                  disabled={Number(cadangan) <= 0}
+                  onClick={() => (setCadangan(String(Math.max(0, Number(cadangan) - 1))), clear("hariCadangan"))}
+                  className="grid size-9 place-items-center rounded-full text-ink-700 transition hover:bg-ink-100 disabled:opacity-30"
+                >
+                  <Minus className="size-4" />
+                </button>
+                <span className="num w-24 text-center text-sm font-semibold text-ink-950" aria-live="polite">
+                  {cadangan === "0" ? "Tidak perlu" : `${cadangan} hari`}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Tambah satu hari"
+                  disabled={Number(cadangan) >= 10}
+                  onClick={() => (setCadangan(String(Math.min(10, Number(cadangan) + 1))), clear("hariCadangan"))}
+                  className="grid size-9 place-items-center rounded-full text-ink-700 transition hover:bg-ink-100 disabled:opacity-30"
+                >
+                  <Plus className="size-4" />
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-ink-400">Umum dipakai:</span>
+                {["1", "2", "3"].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => (setCadangan(n), clear("hariCadangan"))}
+                    className={cn(
+                      "rounded-full px-3 py-1 text-xs font-medium ring-1 transition",
+                      cadangan === n ? "bg-sun-100 text-sun-800 ring-sun-200" : "bg-surface text-ink-600 ring-ink-200 hover:bg-ink-50",
+                    )}
+                  >
+                    {n} hari
+                  </button>
+                ))}
+              </div>
             </div>
+            {err("hariCadangan") && (
+              <p className="mt-2 flex items-center gap-1 text-xs font-medium text-flame-600">
+                <CircleAlert className="size-3.5" /> {err("hariCadangan")![0]}
+              </p>
+            )}
+            <p className="mt-2 text-xs text-ink-400">Maksimal 10 hari.</p>
           </div>
+
+          {/* Biaya selalu dihitung per bulan. */}
+          <input type="hidden" name="periode" value="30" />
         </Langkah>
 
         {/* Langkah 5 — Ringkasan */}
         <Langkah aktif={step === 4} icon={<Check className="size-5" />} judul="Periksa data" keterangan="Klik Ubah bila ada yang salah.">
           <dl className="divide-y divide-ink-100 rounded-2xl ring-1 ring-ink-200">
-            <Ringkas langkah={0} onUbah={ke} judul="Desa" isi={[`${isian.namaDesa || "—"}${isian.nama ? ` · ${isian.nama}` : ""}`, `${num(Number(isian.jumlahRumah), 0)} rumah · ${isian.lokasi === "Bawaan" ? "wilayah umum" : (isian.lokasi ?? "—")}`]} />
+            <Ringkas langkah={0} onUbah={ke} judul="Desa" isi={[isian.namaDesa || "—", `${num(Number(isian.jumlahRumah), 0)} rumah · ${isian.lokasi === "Bawaan" ? "wilayah umum" : (isian.lokasi ?? "—")}`]} />
             <Ringkas langkah={1} onUbah={ke} judul="Kebutuhan listrik" isi={[`${isian.konsumsi || "—"} kWh/hari per rumah`, `${isian.porsiMalam || "—"}% dipakai malam hari`]} />
             <Ringkas
               langkah={2}
@@ -438,19 +447,20 @@ export function PlanForm({
               judul="Baterai"
               isi={
                 isian.sumberPaket === "baterai"
-                  ? [terpilih ? `${terpilih.kode} · ${terpilih.nama}` : "—", terpilih ? `${num(terpilih.kapasitas)} kWh · SoH ${num(terpilih.soh)}% · grade ${terpilih.grade}` : ""]
+                  ? [
+                      terpilihList.length ? terpilihList.map((b) => b.kode).join(", ") : "—",
+                      terpilihList.length ? `${terpilihList.length} baterai · total ${num(kwhTerpilih)} kWh` : "",
+                    ]
                   : ["Profil baterai umum", `${isian.kapasitasPaket || "—"} kWh · SoH ${isian.sohPaket || "—"}%`]
               }
             />
             <Ringkas
               langkah={3}
               onUbah={ke}
-              judul="Tujuan & biaya"
+              judul="Tujuan"
               isi={[
-                `${PRIORITAS.find((p) => p.k === isian.prioritas)?.t ?? "—"} · cadangan ${isian.hariCadangan === "0" ? "tidak ada" : `${isian.hariCadangan} hari`}`,
-                isian.hargaSolarMin
-                  ? `Solar Rp${num(Number(isian.hargaSolarMin), 0)}–Rp${num(Number(isian.hargaSolarMaks), 0)}/liter · per ${isian.periode === "365" ? "tahun" : "bulan"}`
-                  : `Solar harga standar · per ${isian.periode === "365" ? "tahun" : "bulan"}`,
+                PRIORITAS.find((p) => p.k === isian.prioritas)?.t ?? "—",
+                `Cadangan ${isian.hariCadangan === "0" ? "tidak ada" : `${isian.hariCadangan} hari`}`,
               ]}
             />
           </dl>
@@ -459,7 +469,7 @@ export function PlanForm({
         {/* Navigasi */}
         <div className="flex items-center justify-between gap-3 border-t border-ink-100 bg-canvas/60 px-5 py-4 sm:px-8">
           {step === 0 ? (
-            <button type="button" onClick={() => leave("/perencana")} className={buttonClass("ghost", "md")}>
+            <button type="button" onClick={() => leave(ubah?.batal ?? "/perencana")} className={buttonClass("ghost", "md")}>
               Batal
             </button>
           ) : (
@@ -475,7 +485,7 @@ export function PlanForm({
               Lanjut <ArrowRight className="size-4" />
             </button>
           ) : (
-            <SubmitButton pendingText="Menghitung…">Hitung Rencana Energi</SubmitButton>
+            <SubmitButton pendingText="Menghitung…">{ubah ? "Simpan perubahan" : "Hitung Rencana Energi"}</SubmitButton>
           )}
         </div>
       </Card>

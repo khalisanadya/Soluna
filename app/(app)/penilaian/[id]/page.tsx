@@ -2,18 +2,16 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ClipboardCheck, Gauge, PlugZap, Recycle, ShieldCheck } from "lucide-react";
+import { ClipboardCheck, Gauge, Recycle, ShieldCheck } from "lucide-react";
 import { PrintButton } from "@/components/print-button";
-import { Badge, ButtonLink, GradeBadge, Logo, Notice, PageHeader, gradeTone, tingkatSoh } from "@/components/ui";
+import { ButtonLink, GradeBadge, Logo, Notice, PageHeader, gradeTone, tingkatSoh } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
 import { cn, num, tanggal, tanpaPenandaIlustrasi } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import type { Grade, HasilKompatibilitas, HasilPenilaian } from "@/lib/types";
+import type { Grade, HasilPenilaian } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Paspor Baterai" };
-
-const kompatTone = { layak: "leaf", perlu_penyesuaian: "amber", tidak_layak: "flame" } as const;
 
 export default async function PasporPage({ params, searchParams }: PageProps<"/penilaian/[id]">) {
   const user = await requireUser();
@@ -22,7 +20,7 @@ export default async function PasporPage({ params, searchParams }: PageProps<"/p
   const p = await prisma.penilaian.findFirst({
     where: { id, ...(user.peran === "PEMASOK" ? { baterai: { pemasokId: user.pemasokId! } } : {}) },
     include: {
-      baterai: { include: { pemasok: true, cekKompat: { orderBy: { createdAt: "desc" }, take: 1 } } },
+      baterai: { include: { pemasok: true } },
     },
   });
   if (!p) notFound();
@@ -30,7 +28,6 @@ export default async function PasporPage({ params, searchParams }: PageProps<"/p
   const b = p.baterai;
   const g = p.grade as Grade;
   const tone = gradeTone[g];
-  const kompat = b.cekKompat[0]?.hasil as HasilKompatibilitas | undefined;
   const { data: cfg } = await getActiveConfig();
   const soh = tingkatSoh(h.soh, cfg.grade.A, cfg.grade.C);
   const cycles = h.sisa_umur_siklus ?? (h.sisa_umur?.satuan === "siklus" ? h.sisa_umur : null);
@@ -45,20 +42,6 @@ export default async function PasporPage({ params, searchParams }: PageProps<"/p
     ["Tanggal", tanggal(p.createdAt)],
     ["Penerbit paspor", tanpaPenandaIlustrasi(b.pemasok.namaPerusahaan)],
     ["Model", h.model?.versi ?? p.versiModel ?? "—"],
-    ...(user.peran === "ADMIN"
-      ? [
-          [
-            "Kompatibilitas",
-            kompat ? (
-              <Badge tone={kompatTone[kompat.status]}>{kompat.label}</Badge>
-            ) : (
-              <Link href={`/kompatibilitas?baterai=${b.id}`} className="font-medium text-sun-700 hover:underline">
-                Belum dicek
-              </Link>
-            ),
-          ] as [string, ReactNode],
-        ]
-      : []),
   ];
 
   return (
@@ -70,11 +53,6 @@ export default async function PasporPage({ params, searchParams }: PageProps<"/p
         actions={
           <>
             <PrintButton />
-            {user.peran === "ADMIN" && (
-              <ButtonLink href={`/kompatibilitas?baterai=${b.id}`} variant="secondary" className="print:hidden">
-                <PlugZap className="size-4" /> Cek kompatibilitas
-              </ButtonLink>
-            )}
             {user.peran === "PEMASOK" && (
               <ButtonLink href={`/penilaian/baru?baterai=${b.id}`} className="print:hidden">
                 <ClipboardCheck className="size-4" /> Nilai ulang baterai

@@ -17,8 +17,24 @@ export type KompatState =
 export async function runCompatibility(_prev: KompatState, fd: FormData): Promise<KompatState> {
   await requireAdmin();
   const values = formValues(fd);
+  const bateraiId = formString(fd, "bateraiId") || null;
+  const rencanaId = formString(fd, "rencanaId") || null;
+  // Data baterai selalu dari basis data (bukan isian formulir).
+  if (!bateraiId) return { values, errors: { bateraiId: ["Pilih baterai yang akan diperiksa."] }, message: "Pilih baterai terlebih dahulu." };
+  const [b, rencana] = await Promise.all([
+    prisma.baterai.findUnique({ where: { id: bateraiId } }),
+    rencanaId ? prisma.rencanaDesa.findUnique({ where: { id: rencanaId }, select: { hasil: true } }) : null,
+  ]);
+  if (!b || b.sohTerakhir === null || !b.gradeTerakhir) return { values, errors: { bateraiId: ["Baterai belum dinilai."] }, message: "Baterai belum dinilai." };
+  if (!b.teganganNominalV) return { values, errors: { bateraiId: ["Tegangan baterai belum diisi pemasok."] }, message: "Tegangan baterai belum diisi pemasok." };
+  const raw = pick(fd, KOMPAT_FIELDS);
+  raw.vBaterai = String(b.teganganNominalV);
+  raw.grade = b.gradeTerakhir;
+  raw.soh = String(b.sohTerakhir);
+  raw.kapasitas = String(b.kapasitasAwalKwh);
+  raw.paket = String((rencana?.hasil as { ringkasan?: { jumlah_paket?: number } } | undefined)?.ringkasan?.jumlah_paket ?? 1);
   // Semua kolom wajib; aturan yang sama dipakai formulir di peramban.
-  const parsed = kompatSchema.safeParse(pick(fd, KOMPAT_FIELDS));
+  const parsed = kompatSchema.safeParse(raw);
   if (!parsed.success) return { values, errors: z.flattenError(parsed.error).fieldErrors as Record<string, string[]>, message: "Periksa kembali isian yang ditandai." };
   const d = parsed.data;
   const input = {
@@ -37,8 +53,6 @@ export async function runCompatibility(_prev: KompatState, fd: FormData): Promis
   const res = await callEngine<HasilKompatibilitas>("compatibility", input);
   if (!res.ok) return { values, message: res.error };
 
-  const bateraiId = formString(fd, "bateraiId") || null;
-  const rencanaId = formString(fd, "rencanaId") || null;
   await prisma.cekKompatibilitas.create({
     data: { bateraiId, rencanaId, masukan: input, hasil: res.data, status: res.data.status, versiKonfigurasi: res.versiKonfigurasi },
   });

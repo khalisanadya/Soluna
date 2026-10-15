@@ -65,7 +65,7 @@ export default async function RiwayatPage({ searchParams }: PageProps<"/riwayat"
         jenis: "Perencanaan",
         waktu: r.createdAt,
         judul: `${r.namaDesa} — ${r.nama}`,
-        detail: `${h.ringkasan.jumlah_paket} paket · ${num(h.ringkasan.kapasitas_panel_kwp)} kWp · diesel hemat ${num(h.lingkungan.diesel_hemat_liter, 0)} L/${h.lingkungan.periode_hari} hari`,
+        detail: `${h.ringkasan.jumlah_paket} paket · ${num(h.ringkasan.kapasitas_panel_kwp)} kWp`,
         href: `/perencana/${r.id}`,
         versi: `v${r.versiKonfigurasi}`,
         icon: SunMedium,
