@@ -8,7 +8,7 @@ import { Paginasi, bacaHalaman } from "@/components/paginasi";
 import { requireUser } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
 import { bateraiScope } from "@/lib/data";
-import { cn, num } from "@/lib/format";
+import { cn, num, tanpaPenandaIlustrasi } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { JENIS_KIMIA } from "@/lib/wilayah";
 import { FilterForm } from "./filter-form";
@@ -132,7 +132,7 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                     {isAdmin && (
                       <td className="max-w-48 truncate px-3 py-3 text-ink-600">
                         <Link href={`/pemasok/${b.pemasok.id}`} className="hover:underline">
-                          {b.pemasok.namaPerusahaan}
+                          {tanpaPenandaIlustrasi(b.pemasok.namaPerusahaan)}
                         </Link>
                       </td>
                     )}
@@ -188,7 +188,7 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                     <span className="block truncate text-sm text-ink-600">
                       {b.merek} {b.model} · {num(b.kapasitasAwalKwh)} kWh
                     </span>
-                    {isAdmin && <span className="block truncate text-xs text-ink-500">{b.pemasok.namaPerusahaan}</span>}
+                    {isAdmin && <span className="block truncate text-xs text-ink-500">{tanpaPenandaIlustrasi(b.pemasok.namaPerusahaan)}</span>}
                   </span>
                   {b.status === "DINILAI" ? <SohBadge soh={b.sohTerakhir} tinggi={cfg.grade.A} rendah={cfg.grade.C} /> : <Badge tone="sun">Menunggu</Badge>}
                 </Link>

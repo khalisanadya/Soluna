@@ -7,7 +7,7 @@ import { PrintButton } from "@/components/print-button";
 import { Badge, ButtonLink, GradeBadge, Logo, Notice, PageHeader, gradeTone, tingkatSoh } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
-import { cn, num, tanggal } from "@/lib/format";
+import { cn, num, tanggal, tanpaPenandaIlustrasi } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { Grade, HasilKompatibilitas, HasilPenilaian } from "@/lib/types";
 
@@ -33,10 +33,17 @@ export default async function PasporPage({ params, searchParams }: PageProps<"/p
   const kompat = b.cekKompat[0]?.hasil as HasilKompatibilitas | undefined;
   const { data: cfg } = await getActiveConfig();
   const soh = tingkatSoh(h.soh, cfg.grade.A, cfg.grade.C);
+  const cycles = h.sisa_umur_siklus ?? (h.sisa_umur?.satuan === "siklus" ? h.sisa_umur : null);
+  const siklusTengah = cycles?.tengah ?? null;
+  const siklusText = cycles ? `${num(cycles.bawah, 0)}–${num(cycles.atas, 0)} siklus` : "Belum tersedia";
+  const bulan = siklusTengah !== null ? Math.max(0, Math.round(siklusTengah / 30)) : null;
+  const hasilPerluDicek =
+    siklusTengah !== null &&
+    (siklusTengah < 100 || ((g === "A" || g === "B") && siklusTengah < 300) || ((g === "C" || g === "D") && siklusTengah > 1000));
   const nomor = `SLN-${b.kode.replace("BAT-", "")}-${p.createdAt.toISOString().slice(0, 10).replaceAll("-", "")}`;
   const penilaianItems: [string, ReactNode][] = [
     ["Tanggal", tanggal(p.createdAt)],
-    ["Penerbit paspor", b.pemasok.namaPerusahaan],
+    ["Penerbit paspor", tanpaPenandaIlustrasi(b.pemasok.namaPerusahaan)],
     ["Model", h.model?.versi ?? p.versiModel ?? "—"],
     ...(user.peran === "ADMIN"
       ? [
@@ -100,7 +107,7 @@ export default async function PasporPage({ params, searchParams }: PageProps<"/p
             <p className="mt-1 text-ink-700">
               {b.merek} {b.model} · {b.jenisKimia}
             </p>
-            <p className="mt-0.5 text-sm text-ink-500">{b.pemasok.namaPerusahaan}</p>
+            <p className="mt-0.5 text-sm text-ink-500">{tanpaPenandaIlustrasi(b.pemasok.namaPerusahaan)}</p>
           </div>
           <div className="flex items-center gap-3 rounded-2xl p-3 pr-5" style={{ background: `${tone.hex}12`, boxShadow: `inset 0 0 0 1px ${tone.hex}33` }}>
             <GradeBadge grade={g} size="lg" />
@@ -111,6 +118,26 @@ export default async function PasporPage({ params, searchParams }: PageProps<"/p
             </div>
           </div>
         </section>
+
+        <section className="grid gap-4 border-b border-ink-100 p-6 sm:grid-cols-2 sm:p-8">
+          <div>
+            <p className="text-xs text-ink-500">Perkiraan sisa siklus</p>
+            <p className="num mt-1 text-2xl">{siklusText}</p>
+            {siklusTengah !== null && <p className="mt-1 text-sm text-ink-600">Paling mungkin {num(siklusTengah, 0)} siklus</p>}
+            <p className="mt-1 text-xs text-ink-500">Dari model; bukan tanggal kerusakan.</p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-500">Perkiraan penggantian</p>
+            <p className="num mt-1 text-2xl">{bulan !== null ? `± ${bulan} bulan` : "Belum dapat diperkirakan"}</p>
+            {bulan !== null && <p className="mt-1 text-xs text-ink-500">Asumsi 1 siklus/hari (30 siklus per bulan).</p>}
+          </div>
+        </section>
+
+        {hasilPerluDicek && (
+          <Notice tone="warning" className="mx-6 my-6 sm:mx-8" title="Hasil perlu dicek ulang">
+            Nilai sisa siklus dari model perlu diverifikasi terhadap grade dan data uji baterai.
+          </Notice>
+        )}
 
         {h.jalur_daur_ulang && (
           <p className="mx-6 mb-6 flex items-center gap-2 rounded-xl bg-flame-50 px-4 py-3 text-sm font-medium text-flame-600 ring-1 ring-flame-100 sm:mx-8">

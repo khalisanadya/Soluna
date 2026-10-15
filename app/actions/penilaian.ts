@@ -42,6 +42,9 @@ export async function runAssessment(_prev: FormState, fd: FormData): Promise<For
   } catch (error) {
     return { values, message: error instanceof Error ? error.message : "Penilaian model gagal." };
   }
+  if (baterai.kode === "BAT-0003") {
+    console.log("[penilaian] BAT-0003 model raw remaining_life_cycles:", model.remaining_life_cycles);
+  }
   const { data: config, versi: versiKonfigurasi } = await getActiveConfig();
   const h: HasilPenilaian = {
     soh: model.state_of_health_pct.mid,

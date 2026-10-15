@@ -5,6 +5,10 @@ export function num(value: number | null | undefined, digits = 1): string {
   return nf(digits).format(value);
 }
 
+export function tanpaPenandaIlustrasi(value: string): string {
+  return value.replace(/\s*\(ilustrasi\)\s*/gi, "").trim();
+}
+
 /** Durasi hari; null dari mesin hitung berarti tidak terbatas. */
 export function days(value: number | null | undefined, digits = 1): string {
   if (value === null || value === undefined) return "Tak terbatas";

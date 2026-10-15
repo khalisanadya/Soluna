@@ -38,6 +38,11 @@ function isResult(value: unknown): value is BatteryModelResult {
     typeof result.state_of_health_pct.mid === "number" &&
     !!result.remaining_life_cycles &&
     typeof result.remaining_life_cycles.mid === "number" &&
+    [result.remaining_life_cycles.lower, result.remaining_life_cycles.mid, result.remaining_life_cycles.upper].every(
+      (cycle) => typeof cycle === "number" && Number.isFinite(cycle) && cycle >= 0,
+    ) &&
+    result.remaining_life_cycles.lower <= result.remaining_life_cycles.mid &&
+    result.remaining_life_cycles.mid <= result.remaining_life_cycles.upper &&
     typeof result.confidence === "number" &&
     typeof result.model?.version === "string"
   );
@@ -60,12 +65,14 @@ export async function assessWithTrainedModel(input: BatteryModelInput): Promise<
   } catch {
     throw new Error("Layanan model baterai tidak dapat dihubungi.");
   }
-
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     const detail = typeof body?.detail === "string" ? body.detail : response.statusText;
     throw new Error(`Penilaian model gagal (${response.status}). ${detail}`);
   }
   if (!isResult(body)) throw new Error("Respons layanan model baterai tidak sesuai kontrak.");
+  if (input.kapasitas_awal_kwh === 60 && input.kapasitas_aktual_kwh === 45.6) {
+    console.log("[battery-model] BAT-0003 raw remaining_life_cycles:", body.remaining_life_cycles);
+  }
   return body;
 }

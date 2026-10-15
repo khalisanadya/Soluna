@@ -6,7 +6,7 @@ import { ButtonLink, Card, EmptyState, GradeBadge, KeyValue, Notice, PageHeader,
 import { requireUser } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
 import { getBateraiForUser } from "@/lib/data";
-import { num, tanggal } from "@/lib/format";
+import { num, tanggal, tanpaPenandaIlustrasi } from "@/lib/format";
 import type { Grade, HasilPenilaian } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Detail Baterai" };
@@ -141,13 +141,13 @@ export default async function DetailBateraiPage({ params, searchParams }: PagePr
                 ["Didaftarkan", tanggal(b.createdAt)],
               ]}
             />
-            {b.catatan && <p className="mt-3 rounded-xl bg-ink-50 p-3 text-sm text-ink-600">{b.catatan}</p>}
+            {b.catatan && !b.catatan.toLowerCase().includes("data ilustrasi") && <p className="mt-3 rounded-xl bg-ink-50 p-3 text-sm text-ink-600">{b.catatan}</p>}
           </Card>
 
           {isAdmin && (
             <Card>
               <SectionTitle title="Pemasok" action={<Link href={`/pemasok/${b.pemasok.id}`} className="text-sm font-semibold text-sun-700 hover:underline">Profil</Link>} />
-              <p className="font-semibold">{b.pemasok.namaPerusahaan}</p>
+              <p className="font-semibold">{tanpaPenandaIlustrasi(b.pemasok.namaPerusahaan)}</p>
               <p className="text-sm text-ink-600">{b.pemasok.namaPenanggungJawab}</p>
               <p className="mt-2 text-sm text-ink-500">
                 {b.pemasok.telepon} · {b.pemasok.emailPerusahaan}
