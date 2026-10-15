@@ -124,30 +124,28 @@ export const penilaianSchema = z
 
 export const PENILAIAN_FIELDS = ["bateraiId", "kapasitasAwal", "kapasitasAktual", "hambatan", "siklus", "kimia", "usia", "dod", "pengisianCepat", "suhu"];
 
-// Perencana desa: semua kolom wajib (nilai bawaan sudah terisi di formulir).
+// Perencana desa: semua kolom wajib. Parameter teknis (PR, efisiensi, DoD, Wp panel) tidak diisi
+// di sini; nilainya dari Parameter Sistem, dan DoD ditentukan oleh prioritas perencanaan.
 const rencanaDasar = z.object({
   namaDesa: wajib("Nama desa"),
-  nama: wajib("Nama rencana"),
+  nama: z.string().trim().max(120, "Nama rencana maksimal 120 karakter.").optional(),
   jumlahRumah: angkaWajib("Jumlah rumah", (n) => n.int("Jumlah rumah harus bilangan bulat.").min(1, "Jumlah rumah minimal 1.").max(100000, "Jumlah rumah maksimal 100.000.")),
   konsumsi: angkaWajib("Konsumsi per rumah", (n) => n.positive("Konsumsi harus lebih dari 0.").max(100, "Konsumsi maksimal 100 kWh/hari.")),
   porsiMalam: angkaWajib("Pemakaian malam", (n) => n.min(0, "Pemakaian malam 0–100%.").max(100, "Pemakaian malam 0–100%.")),
   lokasi: wajib("Lokasi"),
   hariCadangan: angkaWajib("Hari cadangan", (n) => n.int("Hari cadangan harus bilangan bulat.").min(0, "Hari cadangan 0–10.").max(10, "Hari cadangan 0–10.")),
   sumberPaket: z.enum(["bawaan", "baterai"], "Pilih sumber paket baterai."),
-  hargaSolarMin: angkaWajib("Harga solar terendah", (n) => n.positive("Harga solar harus lebih dari 0.").max(100000, "Harga solar terlalu besar.")),
-  hargaSolarMaks: angkaWajib("Harga solar tertinggi", (n) => n.positive("Harga solar harus lebih dari 0.").max(100000, "Harga solar terlalu besar.")),
+  // Opsional: kosong = rentang harga dari Parameter Sistem.
+  hargaSolarMin: angkaWajib("Harga solar terendah", (n) => n.positive("Harga solar harus lebih dari 0.").max(100000, "Harga solar terlalu besar.")).optional(),
+  hargaSolarMaks: angkaWajib("Harga solar tertinggi", (n) => n.positive("Harga solar harus lebih dari 0.").max(100000, "Harga solar terlalu besar.")).optional(),
   periode: z.enum(["30", "365"], "Pilih periode perbandingan."),
-  psh: angkaWajib("Jam matahari efektif", (n) => n.min(0.5, "Jam matahari efektif 0,5–12 jam.").max(12, "Jam matahari efektif 0,5–12 jam.")),
-  pr: angkaWajib("Rasio kinerja panel", (n) => n.min(10, "Rasio kinerja 10–100%.").max(100, "Rasio kinerja 10–100%.")),
-  efisiensi: angkaWajib("Efisiensi konversi", (n) => n.min(10, "Efisiensi 10–100%.").max(100, "Efisiensi 10–100%.")),
-  dod: angkaWajib("Batas pengosongan", (n) => n.min(10, "Batas pengosongan 10–100%.").max(100, "Batas pengosongan 10–100%.")),
-  wpPanel: angkaWajib("Kapasitas per panel", (n) => n.min(50, "Kapasitas panel 50–1.000 Wp.").max(1000, "Kapasitas panel 50–1.000 Wp.")),
+  prioritas: z.enum(["hemat_diesel", "ketahanan_maksimum", "umur_baterai_maksimum"], "Pilih tujuan utama perencanaan."),
 });
 const paketBawaan = z.object({
   kapasitasPaket: angkaWajib("Kapasitas per paket", (n) => n.positive("Kapasitas harus lebih dari 0.").max(1000, "Kapasitas maksimal 1.000 kWh.")),
   sohPaket: angkaWajib("SoH paket", (n) => n.min(1, "SoH paket 1–100%.").max(100, "SoH paket 1–100%.")),
 });
-const paketBaterai = z.object({ bateraiId: wajib("Baterai").pipe(z.string()) });
+const paketBaterai = z.object({ bateraiId: z.string("Pilih satu baterai untuk rencana ini.").trim().min(1, "Pilih satu baterai untuk rencana ini.") });
 
 export const RENCANA_FIELDS = [...Object.keys(rencanaDasar.shape), "kapasitasPaket", "sohPaket", "bateraiId"];
 
@@ -165,10 +163,42 @@ export function validasiRencana(raw: Record<string, string | undefined>) {
     if (r.success) paket = r.data;
     else Object.assign(errors, z.flattenError(r.error).fieldErrors);
   }
-  if (dasar.success && dasar.data.hargaSolarMin > dasar.data.hargaSolarMaks) errors.hargaSolarMaks = ["Harga tertinggi tidak boleh lebih kecil dari harga terendah."];
+  if (dasar.success) {
+    const { hargaSolarMin: lo, hargaSolarMaks: hi } = dasar.data;
+    if ((lo === undefined) !== (hi === undefined)) errors[lo === undefined ? "hargaSolarMin" : "hargaSolarMaks"] = ["Isi kedua harga, atau kosongkan keduanya."];
+    else if (lo !== undefined && hi !== undefined && lo > hi) errors.hargaSolarMaks = ["Harga tertinggi tidak boleh lebih kecil dari harga terendah."];
+  }
   if (!dasar.success || Object.keys(errors).length) return { ok: false as const, errors };
   return { ok: true as const, data: { ...dasar.data, ...paket } };
 }
+
+// Kompatibilitas & keselamatan: semua kolom wajib agar setiap pemeriksaan (tegangan, daya,
+// kondisi baterai) benar-benar dijalankan.
+export const kompatSchema = z
+  .object({
+    vBaterai: angkaWajib("Tegangan baterai", (n) => n.positive("Tegangan harus lebih dari 0.").max(1500, "Tegangan maksimal 1.500 V.")),
+    grade: z.enum(["A", "B", "C", "D"], "Pilih grade baterai."),
+    soh: angkaWajib("SoH", (n) => n.min(1, "SoH 1–100%.").max(100, "SoH 1–100%.")),
+    kapasitas: angkaWajib("Kapasitas", (n) => n.positive("Kapasitas harus lebih dari 0.").max(1000, "Kapasitas maksimal 1.000 kWh.")),
+    paket: angkaWajib("Jumlah paket", (n) => n.int("Jumlah paket harus bilangan bulat.").min(1, "Minimal 1 paket.").max(1000, "Maksimal 1.000 paket.")),
+    vNominal: angkaWajib("Tegangan nominal", (n) => n.positive("Tegangan harus lebih dari 0.").max(1500, "Tegangan maksimal 1.500 V.")),
+    vMin: angkaWajib("Tegangan minimum", (n) => n.positive("Tegangan harus lebih dari 0.").max(1500, "Tegangan maksimal 1.500 V.")),
+    vMaks: angkaWajib("Tegangan maksimum", (n) => n.positive("Tegangan harus lebih dari 0.").max(1500, "Tegangan maksimal 1.500 V.")),
+    kwInverter: angkaWajib("Daya inverter", (n) => n.positive("Daya harus lebih dari 0.").max(10000, "Daya terlalu besar.")),
+    kwPuncak: angkaWajib("Beban puncak", (n) => n.positive("Beban harus lebih dari 0.").max(10000, "Beban terlalu besar.")),
+  })
+  .refine((d) => d.vMin < d.vMaks, {
+    path: ["vMaks"],
+    message: "Maksimum harus lebih besar dari minimum.",
+    when: (p) => !p.issues.some((i) => i.path?.[0] === "vMin" || i.path?.[0] === "vMaks"),
+  })
+  .refine((d) => d.vNominal >= d.vMin && d.vNominal <= d.vMaks, {
+    path: ["vNominal"],
+    message: "Nominal harus di antara minimum dan maksimum.",
+    when: (p) => !p.issues.some((i) => ["vMin", "vMaks", "vNominal"].includes(String(i.path?.[0]))),
+  });
+
+export const KOMPAT_FIELDS = ["vBaterai", "grade", "soh", "kapasitas", "paket", "vNominal", "vMin", "vMaks", "kwInverter", "kwPuncak"];
 
 export type FieldErrors = Record<string, string[] | undefined>;
 

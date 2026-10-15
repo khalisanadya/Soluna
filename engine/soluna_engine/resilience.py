@@ -12,15 +12,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from .config import MODEL_VERSION, fmt, r, step
+from .config import MODEL_VERSION, PRIORITAS_LABEL, dod_prioritas, fmt, r, step
 
 Prioritas = Literal["hemat_diesel", "ketahanan_maksimum", "umur_baterai_maksimum"]
 
-PRIORITAS_LABEL = {
-    "hemat_diesel": "Hemat diesel",
-    "ketahanan_maksimum": "Ketahanan maksimum",
-    "umur_baterai_maksimum": "Umur baterai maksimum",
-}
 
 
 class ResilienceInput(BaseModel):
@@ -44,15 +39,7 @@ class ResilienceInput(BaseModel):
 def _effective_dod(data: ResilienceInput, cfg: dict[str, Any]) -> tuple[float, str]:
     if data.dod is not None:
         return data.dod, "DoD diisi manual."
-    dod = cfg["dod_prioritas"][data.prioritas]
-    alasan = f"DoD mode {PRIORITAS_LABEL[data.prioritas]}: {fmt(dod * 100)}%."
-    if data.prioritas == "umur_baterai_maksimum" and data.soh * 100 < cfg["ambang_soh_rendah"]:
-        dod = max(0.3, dod - cfg["dod_pengurangan_soh_rendah"])
-        alasan += (
-            f" SoH {fmt(data.soh * 100)}% di bawah {fmt(cfg['ambang_soh_rendah'])}%, "
-            f"batas diperketat menjadi {fmt(dod * 100)}% untuk melindungi baterai."
-        )
-    return dod, alasan
+    return dod_prioritas(data.prioritas, data.soh, cfg)
 
 
 def _days(energy: float, eta: float, load: float, prod: float) -> float:

@@ -10,7 +10,6 @@ import {
   PackagePlus as BatteryPlus,
   Building2,
   CloudRain,
-  History,
   LayoutGrid,
   LogOut,
   MoreHorizontal,
@@ -45,10 +44,6 @@ const ADMIN: Group[] = [
       { href: "/ketahanan", label: "Ketahanan Desa", short: "Ketahanan", icon: CloudRain },
       { href: "/kompatibilitas", label: "Kompatibilitas & Keselamatan", short: "Kompatibel", icon: PlugZap },
     ],
-  },
-  {
-    title: "Pemantauan",
-    items: [{ href: "/riwayat", label: "Riwayat", icon: History }],
   },
   { title: "Pengaturan", items: [{ href: "/pengaturan", label: "Parameter Sistem", short: "Parameter", icon: Settings }] },
 ];

@@ -227,3 +227,34 @@ def test_harga_diesel_dari_masukan():
     assert out["biaya"]["diesel_per_rumah"]["rendah"] == pytest.approx(liter * 10000 / 50, rel=1e-3)
     assert out["biaya"]["diesel_per_rumah"]["tinggi"] == pytest.approx(liter * 15000 / 50, rel=1e-3)
     assert out["parameter"]["harga_diesel_rendah"] == 10000
+
+
+def _plan_prioritas(prioritas, soh=0.7):
+    return plan(PlanInput(jumlah_rumah=50, konsumsi_per_rumah_kwh=1, porsi_malam=0.6, efisiensi=0.9, psh_jam=4, pr=0.75,
+                          hari_cadangan=1, prioritas=prioritas, paket=PaketInput(kapasitas_kwh=50, soh=soh)), CFG)
+
+
+def test_prioritas_hemat_diesel_sama_dengan_contoh_laporan():
+    """Tanpa DoD manual, prioritas hemat diesel memakai DoD 80% → angka bagian 8 laporan."""
+    r = _plan_prioritas("hemat_diesel")
+    assert r["parameter"]["dod"] == pytest.approx(0.8)
+    assert r["ringkasan"]["kapasitas_terpakai_per_paket_kwh"] == approx(28)
+    assert r["ringkasan"]["jumlah_paket"] == 4
+
+
+def test_perbandingan_prioritas_mengikuti_dod_konfigurasi():
+    r = _plan_prioritas("hemat_diesel")
+    p = {x["kunci"]: x for x in r["perbandingan_prioritas"]}
+    assert p["hemat_diesel"]["dod"] == pytest.approx(0.8) and p["hemat_diesel"]["terpilih"]
+    assert p["ketahanan_maksimum"]["dod"] == pytest.approx(0.9)
+    assert p["umur_baterai_maksimum"]["dod"] == pytest.approx(0.6)
+    # Energi terpakai mengikuti DoD; jumlah paket hasil pembulatan rumus yang sama.
+    assert p["ketahanan_maksimum"]["energi_tersedia_kwh"] > p["hemat_diesel"]["energi_tersedia_kwh"] > p["umur_baterai_maksimum"]["energi_tersedia_kwh"]
+    assert p["hemat_diesel"]["jumlah_paket"] == r["ringkasan"]["jumlah_paket"]
+
+
+def test_umur_baterai_soh_rendah_menambah_paket():
+    """SoH 65% < ambang 70%: DoD umur baterai diperketat 60% → 50%, sehingga paket bertambah."""
+    p = {x["kunci"]: x for x in _plan_prioritas("umur_baterai_maksimum", soh=0.65)["perbandingan_prioritas"]}
+    assert p["umur_baterai_maksimum"]["dod"] == pytest.approx(0.5)
+    assert p["umur_baterai_maksimum"]["jumlah_paket"] > p["hemat_diesel"]["jumlah_paket"]

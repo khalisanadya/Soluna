@@ -34,13 +34,14 @@ export default async function KetahananPage({ searchParams }: PageProps<"/ketaha
     pr: h.parameter.pr,
     efisiensi: h.parameter.efisiensi,
     porsi_malam: porsiMalam,
+    prioritas: h.parameter.prioritas,
   });
 
   const plans = rencana.map((r) => toInitial(r.id, `${r.namaDesa} — ${r.nama}`, r.hasil as unknown as HasilRencana, (r.masukan as { porsi_malam: number }).porsi_malam));
   const pilihan = typeof sp.rencana === "string" ? plans.find((p) => p.rencanaId === sp.rencana) : undefined;
   const fallback: SimInitial = {
     rencanaId: null,
-    nama: "Profil test case (ilustrasi)",
+    nama: "Contoh laporan (ilustrasi)",
     beban_harian_kwh: 50,
     jumlah_paket: 4,
     kapasitas_kwh: cfg.profil_paket.kapasitas_kwh,
@@ -56,8 +57,8 @@ export default async function KetahananPage({ searchParams }: PageProps<"/ketaha
     <>
       <PageHeader
         eyebrow="Perencanaan"
-        title="Berapa lama desa bertahan?"
-        description="Uji cuaca normal, mendung panjang, dan hujan beberapa hari. Lepas beban bertahap agar beban kritis tetap menyala. Ini simulasi — sistem tidak mengendalikan beban nyata."
+        title="Ketahanan desa"
+        description="Berapa lama listrik desa bertahan saat cuaca buruk. Ini simulasi, bukan kendali beban nyata."
       />
       <Simulator
         initial={pilihan ?? plans[0] ?? fallback}

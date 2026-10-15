@@ -114,7 +114,7 @@ export async function AdminDashboard() {
             <ButtonLink href="/baterai" variant="secondary">
               <BatteryCharging className="size-4" /> Tambah / Cari baterai
             </ButtonLink>
-            <ButtonLink href="/perencana">
+            <ButtonLink href="/perencana/baru">
               <SunMedium className="size-4" /> Rencana baru
             </ButtonLink>
           </>
@@ -132,7 +132,7 @@ export async function AdminDashboard() {
         <Card className="mb-4 border-dashed">
           <SectionTitle title="Profil energi desa belum tersedia" />
           <p className="text-sm text-ink-600">Buat rencana desa untuk melihat kebutuhan energi, penghematan diesel, iuran, dan titik impas.</p>
-          <ButtonLink href="/perencana" className="mt-3">Buat rencana desa</ButtonLink>
+          <ButtonLink href="/perencana/baru" className="mt-3">Buat rencana desa</ButtonLink>
         </Card>
       )}
 
@@ -209,7 +209,7 @@ export async function AdminDashboard() {
                 icon={<SunMedium className="size-5" />}
                 title="Belum ada rencana energi desa"
                 description="Buat rencana dari jumlah rumah, pola pemakaian, dan lokasi. Ringkasan kebutuhan energi, panel, baterai, dan biaya akan tampil di sini."
-                action={<ButtonLink href="/perencana">Buat rencana desa</ButtonLink>}
+                action={<ButtonLink href="/perencana/baru">Buat rencana desa</ButtonLink>}
                 className="py-10"
               />
             </Card>

@@ -31,19 +31,15 @@ export async function runPlan(_prev: FormState, fd: FormData): Promise<FormState
     paket = { sumber: "bawaan", kapasitas_kwh: d.kapasitasPaket, soh: d.sohPaket! / 100 };
   }
 
-  const nama = d.nama;
+  const nama = d.nama || `Rencana ${new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date())}`;
   const namaDesa = d.namaDesa;
   const input = {
     jumlah_rumah: d.jumlahRumah,
     konsumsi_per_rumah_kwh: d.konsumsi,
     porsi_malam: d.porsiMalam / 100,
     lokasi: d.lokasi,
-    psh_jam: d.psh,
-    pr: d.pr / 100,
-    efisiensi: d.efisiensi / 100,
-    dod: d.dod / 100,
     hari_cadangan: d.hariCadangan,
-    kapasitas_per_panel_wp: d.wpPanel,
+    prioritas: d.prioritas,
     paket,
     periode_hari: Number(d.periode),
     harga_diesel_rendah: d.hargaSolarMin,

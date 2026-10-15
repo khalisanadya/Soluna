@@ -75,10 +75,10 @@ export default async function SiklusHidupPage({ searchParams }: PageProps<"/sikl
                   <thead className="text-left text-xs text-ink-500">
                     <tr className="border-b border-ink-100">
                       <th className="py-2 pr-3 font-medium">Baterai</th>
-                      <th className="px-3 py-2 text-right font-medium">SoH</th>
-                      <th className="px-3 py-2 text-right font-medium">Tren</th>
-                      <th className="px-3 py-2 font-medium">Ganti sekitar</th>
-                      <th className="py-2 pl-3 font-medium">Status</th>
+                      <th className="px-3 py-2 text-center font-medium">SoH</th>
+                      <th className="px-3 py-2 text-center font-medium">Tren</th>
+                      <th className="px-3 py-2 text-center font-medium">Ganti sekitar</th>
+                      <th className="py-2 pl-3 text-center font-medium">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ink-100">
@@ -95,13 +95,13 @@ export default async function SiklusHidupPage({ searchParams }: PageProps<"/sikl
                               {b.merek} {b.model}
                             </span>
                           </td>
-                          <td className="num px-3 py-3 text-right">{num(r.soh)}%</td>
-                          <td className={cn("num px-3 py-3 text-right", (r.tren_per_tahun ?? 0) < -8 && "text-flame-600")}>{r.tren_per_tahun !== null ? `${num(r.tren_per_tahun, 1)}%/th` : "—"}</td>
-                          <td className="px-3 py-3">
+                          <td className="num px-3 py-3 text-center">{num(r.soh)}%</td>
+                          <td className={cn("num px-3 py-3 text-center", (r.tren_per_tahun ?? 0) < -8 && "text-flame-600")}>{r.tren_per_tahun !== null ? `${num(r.tren_per_tahun, 1)}%/th` : "—"}</td>
+                          <td className="px-3 py-3 text-center">
                             <span className="font-medium">{r.status === "daur_ulang" ? "Sekarang" : bulanTahun(r.jadwal_penggantian)}</span>
                             {r.dasar_jadwal && <span className="block text-xs text-ink-500">{r.dasar_jadwal}</span>}
                           </td>
-                          <td className="py-3 pl-3">
+                          <td className="py-3 pl-3 text-center">
                             <Badge tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Badge>
                           </td>
                         </tr>

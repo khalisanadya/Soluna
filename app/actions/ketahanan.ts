@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { callEngine, explainResult, type Penjelasan } from "@/lib/engine";
+import { callEngine, type Penjelasan } from "@/lib/engine";
 import { prisma } from "@/lib/prisma";
 import type { HasilKetahanan } from "@/lib/types";
 
@@ -37,8 +37,8 @@ export async function simulateResilience(raw: InputKetahanan): Promise<SimulasiR
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Masukan tidak valid." };
   const res = await callEngine<HasilKetahanan>("resilience", parsed.data);
   if (!res.ok) return res;
-  const penjelasan = await explainResult("ketahanan", res.data);
-  return { ok: true, data: res.data, penjelasan, versiKonfigurasi: res.versiKonfigurasi };
+  // Penjelasan teks panjang tidak lagi ditampilkan di halaman, jadi tidak diminta (lebih cepat).
+  return { ok: true, data: res.data, penjelasan: null, versiKonfigurasi: res.versiKonfigurasi };
 }
 
 export async function saveSimulation(raw: InputKetahanan, nama: string, rencanaId: string | null): Promise<{ ok: boolean; message: string }> {

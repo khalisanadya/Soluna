@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn, num } from "@/lib/format";
 
 /* Paginasi seragam untuk semua daftar data: 10 baris per halaman, nomor halaman di bawah tabel,
-   dan keterangan jumlah ("Baterai 1–10 dari 12" atau "Total 4 baterai"). */
+   dan keterangan jumlah ("Menampilkan 1–10 dari 12 baterai"). */
 
 export const PER_HALAMAN = 10;
 
@@ -70,25 +70,14 @@ export function Paginasi({
   const dari = (halaman - 1) * PER_HALAMAN + 1;
   const tombol = "grid h-9 min-w-9 place-items-center rounded-full px-3 text-sm font-medium transition-colors";
   const href = (n: number) => hrefDengan(basePath, sp, param, n);
-  const Kapital = satuan.charAt(0).toUpperCase() + satuan.slice(1);
   if (total === 0) return null;
 
   return (
     <nav aria-label={`Halaman daftar ${satuan}`} className={cn("mt-3 flex flex-col items-center justify-between gap-3 px-1", !ringkas && "sm:flex-row", className)}>
       <p className="text-sm text-ink-500">
-        {jumlahHalaman === 1 ? (
-          <>
-            Total <span className="num font-medium text-ink-800">{num(total, 0)}</span> {satuan}
-          </>
-        ) : (
-          <>
-            {Kapital}{" "}
-            <span className="num font-medium text-ink-800">
-              {num(dari, 0)}–{num(dari + tampil - 1, 0)}
-            </span>{" "}
-            dari <span className="num font-medium text-ink-800">{num(total, 0)}</span>
-          </>
-        )}
+        Menampilkan{" "}
+        <span className="num font-medium text-ink-800">{jumlahHalaman === 1 ? num(tampil, 0) : `${num(dari, 0)}–${num(dari + tampil - 1, 0)}`}</span> dari{" "}
+        <span className="num font-medium text-ink-800">{num(total, 0)}</span> {satuan}
       </p>
       {jumlahHalaman > 1 && (
         <div className="flex items-center gap-1">

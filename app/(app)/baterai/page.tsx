@@ -102,10 +102,10 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                   <th className="px-5 py-3 font-medium">Kode</th>
                   <th className="px-3 py-3 font-medium">Baterai</th>
                   {isAdmin && <th className="px-3 py-3 font-medium">Pemasok</th>}
-                  <th className="px-3 py-3 text-right font-medium">Kapasitas</th>
+                  <th className="px-3 py-3 text-center font-medium">Kapasitas</th>
                   <th className="w-24 px-2 py-3 text-center font-medium">Status</th>
                   <th className="w-24 px-2 py-3 text-center font-medium">SoH</th>
-                  <th className="px-5 py-3" />
+                  <th className="px-5 py-3 text-center font-medium">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100">
@@ -131,7 +131,7 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                         </Link>
                       </td>
                     )}
-                    <td className="num px-3 py-3 text-right">{num(b.kapasitasAwalKwh)} kWh</td>
+                    <td className="num px-3 py-3 text-center whitespace-nowrap">{num(b.kapasitasAwalKwh)} kWh</td>
                     <td className="px-2 py-3">
                       <div className="flex justify-center">
                         <GradeBadge grade={b.gradeTerakhir} size="sm" />
@@ -140,7 +140,7 @@ export default async function BateraiPage({ searchParams }: PageProps<"/baterai"
                     <td className="px-2 py-3 text-center">
                       <SohBadge soh={b.sohTerakhir} tinggi={cfg.grade.A} rendah={cfg.grade.C} />
                     </td>
-                    <td className="px-5 py-3 text-right">
+                    <td className="px-5 py-3 text-center">
                       {isAdmin ? (
                         <ButtonLink href={`/baterai/${b.id}`} size="sm" variant="secondary">
                           {b.status === "DINILAI" ? "Lihat assessment" : "Menunggu pemasok"}

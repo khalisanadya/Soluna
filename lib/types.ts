@@ -62,7 +62,23 @@ export type HasilRencana = {
     /** Ada pada rencana yang dibuat dengan isian harga solar. */
     harga_diesel_rendah?: number;
     harga_diesel_tinggi?: number;
+    /** Ada pada rencana yang dibuat setelah prioritas perencanaan ditambahkan. */
+    prioritas?: Prioritas;
+    prioritas_label?: string;
+    alasan_dod?: string;
+    faktor_keamanan_inverter?: number;
   };
+  perbandingan_prioritas?: {
+    kunci: Prioritas;
+    label: string;
+    dod: number;
+    kapasitas_terpakai_per_paket_kwh: number;
+    paket_siklus_harian: number;
+    jumlah_paket: number;
+    energi_tersedia_kwh: number;
+    investasi: Rentang;
+    terpilih: boolean;
+  }[];
   pemeriksaan: { nama: string; lulus: boolean; keterangan: string }[];
   lingkungan: { diesel_hemat_liter: number; co2_dihindari_kg: number; periode_hari: number };
   biaya: {
@@ -79,6 +95,8 @@ export type HasilRencana = {
 };
 
 export type Rentang = { rendah: number; tinggi: number };
+
+export type Prioritas = "hemat_diesel" | "ketahanan_maksimum" | "umur_baterai_maksimum";
 
 export type TingkatKey = "penuh" | "tanpa_kenyamanan" | "kritis_saja";
 

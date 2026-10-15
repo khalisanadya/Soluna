@@ -66,3 +66,27 @@ def fmt(x: float, digits: int = 2) -> str:
     if "," in s:
         s = s.rstrip("0").rstrip(",")
     return s
+
+
+PRIORITAS_LABEL = {
+    "hemat_diesel": "Hemat diesel",
+    "ketahanan_maksimum": "Ketahanan maksimum",
+    "umur_baterai_maksimum": "Umur baterai maksimum",
+}
+
+
+def dod_prioritas(prioritas: str, soh: float, cfg: dict[str, Any]) -> tuple[float, str]:
+    """Batas pengosongan (DoD) menurut prioritas (laporan Modul B, Ketahanan desa).
+
+    Nilai per prioritas diambil dari konfigurasi (dod_prioritas). Mode umur baterai maksimum
+    memperketat batas untuk baterai ber-SoH rendah (ambang_soh_rendah, dod_pengurangan_soh_rendah).
+    """
+    dod = cfg["dod_prioritas"][prioritas]
+    alasan = f"DoD mode {PRIORITAS_LABEL[prioritas]}: {fmt(dod * 100)}%."
+    if prioritas == "umur_baterai_maksimum" and soh * 100 < cfg["ambang_soh_rendah"]:
+        dod = max(0.3, dod - cfg["dod_pengurangan_soh_rendah"])
+        alasan += (
+            f" SoH {fmt(soh * 100)}% di bawah {fmt(cfg['ambang_soh_rendah'])}%, "
+            f"batas diperketat menjadi {fmt(dod * 100)}% untuk melindungi baterai."
+        )
+    return dod, alasan

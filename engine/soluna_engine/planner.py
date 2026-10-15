@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from .config import MODEL_VERSION, ceil, fmt, r, step
+from .config import MODEL_VERSION, PRIORITAS_LABEL, ceil, dod_prioritas, fmt, r, step
 
 
 class PaketInput(BaseModel):
@@ -34,6 +34,8 @@ class PlanInput(BaseModel):
     # Biaya diesel di desa (laporan Modul B: masukan perencana). Kosong = rentang dari konfigurasi.
     harga_diesel_rendah: float | None = Field(default=None, gt=0)
     harga_diesel_tinggi: float | None = Field(default=None, gt=0)
+    # Prioritas perencanaan menentukan batas pengosongan (DoD) bila DoD tidak diisi manual.
+    prioritas: Literal["hemat_diesel", "ketahanan_maksimum", "umur_baterai_maksimum"] = "hemat_diesel"
 
 
 def ukuran_paket(e_malam: float, kap: float, soh: float, dod: float, hari_cadangan: int) -> tuple[float, int, int]:
@@ -60,11 +62,14 @@ def plan(data: PlanInput, cfg: dict[str, Any]) -> dict[str, Any]:
     psh = pick(data.psh_jam, psh_default, "PSH (dari lokasi)" if data.lokasi in cfg["lokasi_psh"] else "PSH")
     pr = pick(data.pr, cfg["surya"]["pr"], "PR")
     eta = pick(data.efisiensi, cfg["efisiensi"], "Efisiensi")
-    dod = pick(data.dod, cfg["dod"], "DoD")
     hari_cadangan = pick(data.hari_cadangan, cfg["hari_cadangan"], "Hari cadangan")
     wp_panel = pick(data.kapasitas_per_panel_wp, cfg["surya"]["kapasitas_per_panel_wp"], "Kapasitas per panel")
     kap = pick(data.paket.kapasitas_kwh, cfg["profil_paket"]["kapasitas_kwh"], "Kapasitas paket")
     soh = pick(data.paket.soh, cfg["profil_paket"]["soh"], "SoH paket")
+    if data.dod is not None:
+        dod, alasan_dod = data.dod, "DoD diisi manual."
+    else:
+        dod, alasan_dod = dod_prioritas(data.prioritas, soh, cfg)
     c_rate = cfg["profil_paket"]["c_rate_maks"]
 
     L: list[dict[str, Any]] = []
@@ -206,6 +211,27 @@ def plan(data: PlanInput, cfg: dict[str, Any]) -> dict[str, Any]:
         for lvl in ("rendah", "tinggi")
     }
 
+    def investasi_untuk(n: int) -> dict[str, float]:
+        def biaya(level: str) -> float:
+            return (n * kap * pp[f"harga_per_kwh_{level}"] + kwp_terpasang * s[f"harga_per_kwp_{level}"] + inverter_kw * cfg["harga_inverter_per_kw"]) * (1 + cfg["biaya_lain_persen"])
+        return {"rendah": r(biaya("rendah"), 0), "tinggi": r(biaya("tinggi"), 0)}
+
+    perbandingan = []
+    for kunci, label in PRIORITAS_LABEL.items():
+        d_p, _ = (dod, alasan_dod) if data.dod is not None else dod_prioritas(kunci, soh, cfg)
+        cp, ns, npk = ukuran_paket(e_malam, kap, soh, d_p, hari_cadangan)
+        perbandingan.append({
+            "kunci": kunci,
+            "label": label,
+            "dod": d_p,
+            "kapasitas_terpakai_per_paket_kwh": r(cp),
+            "paket_siklus_harian": ns,
+            "jumlah_paket": npk,
+            "energi_tersedia_kwh": r(npk * cp),
+            "investasi": investasi_untuk(npk),
+            "terpilih": kunci == data.prioritas,
+        })
+
     return {
         "ringkasan": {
             "kebutuhan_harian_kwh": r(e_harian),
@@ -228,8 +254,11 @@ def plan(data: PlanInput, cfg: dict[str, Any]) -> dict[str, Any]:
             "periode_hari": data.periode_hari, "nama_paket": data.paket.nama or cfg["profil_paket"]["nama"],
             "sumber_paket": data.paket.sumber,
             "harga_diesel_rendah": d["harga_per_liter_rendah"], "harga_diesel_tinggi": d["harga_per_liter_tinggi"],
+            "prioritas": data.prioritas, "prioritas_label": PRIORITAS_LABEL[data.prioritas], "alasan_dod": alasan_dod,
+            "faktor_keamanan_inverter": cfg["faktor_keamanan_inverter"],
         },
         "pemeriksaan": pemeriksaan,
+        "perbandingan_prioritas": perbandingan,
         "lingkungan": {"diesel_hemat_liter": r(liter), "co2_dihindari_kg": r(co2_kg), "periode_hari": data.periode_hari},
         "biaya": {
             "investasi": {k: r(v, 0) for k, v in investasi.items()},

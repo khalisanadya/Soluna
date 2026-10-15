@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
-import { callEngine, explainResult, type Penjelasan } from "@/lib/engine";
-import { formNumber, formString } from "@/lib/format";
+import { callEngine, type Penjelasan } from "@/lib/engine";
+import { z } from "zod";
+import { formString } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { HasilKompatibilitas } from "@/lib/types";
-import { formValues } from "@/lib/validation";
+import { KOMPAT_FIELDS, formValues, kompatSchema, pick } from "@/lib/validation";
 
 export type KompatState =
   | { values?: Record<string, string>; errors?: Record<string, string[]>; message?: string; hasil?: HasilKompatibilitas; penjelasan?: Penjelasan | null }
@@ -16,36 +17,22 @@ export type KompatState =
 export async function runCompatibility(_prev: KompatState, fd: FormData): Promise<KompatState> {
   await requireAdmin();
   const values = formValues(fd);
+  // Semua kolom wajib; aturan yang sama dipakai formulir di peramban.
+  const parsed = kompatSchema.safeParse(pick(fd, KOMPAT_FIELDS));
+  if (!parsed.success) return { values, errors: z.flattenError(parsed.error).fieldErrors as Record<string, string[]>, message: "Periksa kembali isian yang ditandai." };
+  const d = parsed.data;
   const input = {
-    tegangan_baterai_v: formNumber(fd, "vBaterai"),
-    tegangan_inverter_nominal_v: formNumber(fd, "vNominal"),
-    tegangan_inverter_min_v: formNumber(fd, "vMin"),
-    tegangan_inverter_maks_v: formNumber(fd, "vMaks"),
-    daya_inverter_kw: formNumber(fd, "kwInverter"),
-    daya_puncak_kw: formNumber(fd, "kwPuncak"),
-    grade: formString(fd, "grade") || undefined,
-    soh: formNumber(fd, "soh"),
-    jumlah_paket: formNumber(fd, "paket"),
-    kapasitas_paket_kwh: formNumber(fd, "kapasitas"),
+    tegangan_baterai_v: d.vBaterai,
+    tegangan_inverter_nominal_v: d.vNominal,
+    tegangan_inverter_min_v: d.vMin,
+    tegangan_inverter_maks_v: d.vMaks,
+    daya_inverter_kw: d.kwInverter,
+    daya_puncak_kw: d.kwPuncak,
+    grade: d.grade,
+    soh: d.soh,
+    jumlah_paket: d.paket,
+    kapasitas_paket_kwh: d.kapasitas,
   };
-  const errors: Record<string, string[]> = {};
-  const req: [keyof typeof input, string][] = [
-    ["tegangan_baterai_v", "vBaterai"],
-    ["tegangan_inverter_nominal_v", "vNominal"],
-    ["tegangan_inverter_min_v", "vMin"],
-    ["tegangan_inverter_maks_v", "vMaks"],
-  ];
-  for (const [k, f] of req) {
-    const v = input[k] as number | undefined;
-    if (v === undefined || Number.isNaN(v) || v <= 0) errors[f] = ["Wajib diisi, lebih dari 0."];
-  }
-  for (const [k, f] of [["daya_inverter_kw", "kwInverter"], ["daya_puncak_kw", "kwPuncak"], ["kapasitas_paket_kwh", "kapasitas"]] as const) {
-    const v = input[k];
-    if (v !== undefined && (Number.isNaN(v) || v <= 0)) errors[f] = ["Harus lebih dari 0."];
-  }
-  if (input.soh !== undefined && (Number.isNaN(input.soh) || input.soh < 0 || input.soh > 100)) errors.soh = ["SoH 0–100%."];
-  if (input.jumlah_paket !== undefined && (!Number.isInteger(input.jumlah_paket) || input.jumlah_paket < 1)) errors.paket = ["Bilangan bulat ≥ 1."];
-  if (Object.keys(errors).length) return { values, errors, message: "Periksa kembali isian yang ditandai." };
 
   const res = await callEngine<HasilKompatibilitas>("compatibility", input);
   if (!res.ok) return { values, message: res.error };
@@ -57,5 +44,6 @@ export async function runCompatibility(_prev: KompatState, fd: FormData): Promis
   });
   if (bateraiId) revalidatePath(`/baterai/${bateraiId}`);
   revalidatePath("/kompatibilitas");
-  return { values, hasil: res.data, penjelasan: await explainResult("kompatibilitas", res.data) };
+  // Penjelasan teks panjang tidak lagi ditampilkan; tidak diminta agar lebih cepat.
+  return { values, hasil: res.data, penjelasan: null };
 }

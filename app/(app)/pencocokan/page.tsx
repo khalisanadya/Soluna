@@ -45,7 +45,7 @@ export default async function PencocokanPage({ searchParams }: PageProps<"/penco
           icon={<SunMedium className="size-5" />}
           title="Belum ada rencana desa"
           description="Pencocokan membutuhkan kebutuhan energi malam, batas pengosongan, dan hari cadangan dari sebuah rencana."
-          action={<ButtonLink href="/perencana">Buat rencana desa</ButtonLink>}
+          action={<ButtonLink href="/perencana/baru">Buat rencana desa</ButtonLink>}
         />
       </>
     );

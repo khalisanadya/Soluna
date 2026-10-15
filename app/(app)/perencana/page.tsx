@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SunMedium } from "lucide-react";
-import { Card, EmptyState, IlustrasiTag, PageHeader, SectionTitle } from "@/components/ui";
+import { Plus, SunMedium } from "lucide-react";
+import { ButtonLink, Card, EmptyState, IlustrasiTag, PageHeader } from "@/components/ui";
 import { Paginasi, bacaHalaman } from "@/components/paginasi";
 import { requireAdmin } from "@/lib/auth";
-import { getActiveConfig } from "@/lib/config";
 import { num, tanggal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { HasilRencana } from "@/lib/types";
-import { PlanForm } from "./plan-form";
 
 export const metadata: Metadata = { title: "Perencana Desa" };
 
@@ -17,73 +15,80 @@ export default async function PerencanaPage({ searchParams }: PageProps<"/perenc
   const sp = await searchParams;
   const totalRencana = await prisma.rencanaDesa.count();
   const hal = bacaHalaman(sp, totalRencana);
-  const [{ data: cfg }, rencana, baterai] = await Promise.all([
-    getActiveConfig(),
-    prisma.rencanaDesa.findMany({ orderBy: { createdAt: "desc" }, skip: hal.skip, take: hal.take }),
-    prisma.baterai.findMany({
-      where: { status: "DINILAI", gradeTerakhir: { in: ["A", "B", "C"] } },
-      orderBy: { sohTerakhir: "desc" },
-      select: { id: true, kode: true, merek: true, model: true, kapasitasAwalKwh: true, sohTerakhir: true, gradeTerakhir: true },
-    }),
-  ]);
+  const rencana = await prisma.rencanaDesa.findMany({ orderBy: { createdAt: "desc" }, skip: hal.skip, take: hal.take });
 
   return (
     <>
       <PageHeader
         eyebrow="Perencanaan"
-        title="Rancang sistem energi desa"
-        description="Masukkan profil kebutuhan desa untuk menghitung paket baterai, panel surya, inverter, dan perbandingan biaya dengan genset diesel."
+        title="Perencana desa"
+        description="Rancangan panel surya, baterai, dan inverter untuk setiap desa."
+        actions={
+          <ButtonLink href="/perencana/baru">
+            <Plus className="size-4" /> Tambah rencana
+          </ButtonLink>
+        }
       />
-      <div className="grid gap-4 xl:grid-cols-[1fr_22rem]">
-        <PlanForm
-          lokasi={Object.entries(cfg.lokasi_psh).map(([k, v]) => ({ nama: k, psh: v }))}
-          baterai={baterai.map((b) => ({ id: b.id, label: `${b.kode} · ${b.merek} ${b.model} — ${num(b.kapasitasAwalKwh)} kWh, SoH ${num(b.sohTerakhir)}%, grade ${b.gradeTerakhir}` }))}
-          defaults={{
-            psh: cfg.surya.psh_jam,
-            pr: Math.round(cfg.surya.pr * 100),
-            efisiensi: Math.round(cfg.efisiensi * 100),
-            dod: Math.round(cfg.dod * 100),
-            hariCadangan: cfg.hari_cadangan,
-            wpPanel: cfg.surya.kapasitas_per_panel_wp,
-            kapasitasPaket: cfg.profil_paket.kapasitas_kwh,
-            sohPaket: Math.round(cfg.profil_paket.soh * 100),
-            hargaSolarMin: cfg.diesel.harga_per_liter_rendah,
-            hargaSolarMaks: cfg.diesel.harga_per_liter_tinggi,
-          }}
-        />
-        <aside>
-          <Card className="xl:sticky xl:top-6">
-            <SectionTitle title="Rencana tersimpan" />
-            {rencana.length ? (
-              <ul className="-mx-2 space-y-1">
+      <Card className="!p-0">
+        {rencana.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="bg-ink-50 text-xs text-ink-500">
+                <tr>
+                  <th className="px-5 py-3 font-medium sm:px-6">Desa & rencana</th>
+                  <th className="px-3 py-3 text-center font-medium">Rumah</th>
+                  <th className="px-3 py-3 text-center font-medium">Kebutuhan</th>
+                  <th className="px-3 py-3 text-center font-medium">Baterai</th>
+                  <th className="px-3 py-3 text-center font-medium">Panel</th>
+                  <th className="px-3 py-3 text-center font-medium">Inverter</th>
+                  <th className="px-3 py-3 text-center font-medium">Dibuat</th>
+                  <th className="px-5 py-3 text-center font-medium sm:px-6">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-100">
                 {rencana.map((r) => {
                   const h = r.hasil as unknown as HasilRencana;
+                  const m = r.masukan as { jumlah_rumah?: number };
                   return (
-                    <li key={r.id}>
-                      <Link href={`/perencana/${r.id}`} className="block rounded-xl p-2 hover:bg-ink-50">
-                        <span className="flex items-center gap-2 text-sm font-semibold">
+                    <tr key={r.id} className="hover:bg-ink-50/70">
+                      <td className="px-5 py-3 sm:px-6">
+                        <Link href={`/perencana/${r.id}`} className="flex items-center gap-2 font-semibold hover:underline">
                           {r.namaDesa} {r.ilustrasi && <IlustrasiTag />}
-                        </span>
-                        <span className="block text-xs text-ink-500">
-                          {r.nama} · {tanggal(r.createdAt)}
-                        </span>
-                        <span className="num mt-1 block text-xs text-ink-600">
-                          {h.ringkasan.jumlah_paket} paket · {num(h.ringkasan.kapasitas_panel_kwp)} kWp · {h.ringkasan.inverter_kw} kW
-                        </span>
-                      </Link>
-                    </li>
+                        </Link>
+                        <span className="block text-xs text-ink-500">{r.nama}</span>
+                      </td>
+                      <td className="num px-3 py-3 text-center">{num(m.jumlah_rumah, 0)}</td>
+                      <td className="num px-3 py-3 text-center whitespace-nowrap">{num(h.ringkasan.kebutuhan_harian_kwh)} kWh/hari</td>
+                      <td className="num px-3 py-3 text-center">{h.ringkasan.jumlah_paket} paket</td>
+                      <td className="num px-3 py-3 text-center">{num(h.ringkasan.kapasitas_panel_terpasang_kwp)} kWp</td>
+                      <td className="num px-3 py-3 text-center">{h.ringkasan.inverter_kw} kW</td>
+                      <td className="px-3 py-3 text-center whitespace-nowrap text-ink-600">{tanggal(r.createdAt)}</td>
+                      <td className="px-5 py-3 text-center sm:px-6">
+                        <ButtonLink href={`/perencana/${r.id}`} size="sm" variant="secondary">
+                          Lihat hasil
+                        </ButtonLink>
+                      </td>
+                    </tr>
                   );
                 })}
-              </ul>
-            ) : (
-              <EmptyState icon={<SunMedium className="size-5" />} title="Belum ada rencana" className="py-8" />
-            )}
-            {rencana.length > 0 && (
-              <Paginasi basePath="/perencana" sp={sp} halaman={hal.halaman} total={totalRencana} tampil={rencana.length} satuan="rencana" ringkas className="border-t border-ink-100 pt-3" />
-            )}
-          </Card>
-        </aside>
-      </div>
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState
+            icon={<SunMedium className="size-5" />}
+            title="Belum ada rencana"
+            description="Buat rencana pertama untuk desa Anda."
+            action={
+              <ButtonLink href="/perencana/baru">
+                <Plus className="size-4" /> Tambah rencana
+              </ButtonLink>
+            }
+            className="m-5 py-10 sm:m-6"
+          />
+        )}
+      </Card>
+      {rencana.length > 0 && <Paginasi basePath="/perencana" sp={sp} halaman={hal.halaman} total={totalRencana} tampil={rencana.length} satuan="rencana" />}
     </>
   );
 }
