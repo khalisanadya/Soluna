@@ -12,7 +12,7 @@
 
 <div align="center">
 
-**[Tonton Video Demo](https://youtu.be/HViFoydzQK0)** · **[Repositori Model Baterai](https://github.com/REPLACE-ME/soluna-model)**
+**[Tonton Video Demo](https://youtu.be/HViFoydzQK0)** · **[Repositori Model Baterai](https://github.com/ladyfanning001/EV-predict)**
 
 </div>
 
@@ -113,7 +113,7 @@ Model baterai terlatih berjalan sebagai layanan terpisah (repositori sendiri) da
 
 Model machine learning **dikembangkan dan dilatih di repositori tersendiri** oleh AI/ML engineer kami, sehingga dapat diiterasi dan diberi versi terpisah dari aplikasi web. Pelatihan model berada di luar lingkup repositori ini.
 
-**[soluna-model](https://github.com/REPLACE-ME/soluna-model)**
+**[soluna-model](https://github.com/ladyfanning001/EV-predict)**
 
 | Item | Rincian |
 | --- | --- |
@@ -194,12 +194,12 @@ soluna/
 1. **Node.js 22+**
 2. **Python 3.11+**
 3. **PostgreSQL**
-4. **Model penilaian baterai** yang sedang berjalan dari [repositori model](https://github.com/REPLACE-ME/soluna-model) (wajib untuk penilaian)
+4. **Model penilaian baterai** yang sedang berjalan dari https://github.com/ladyfanning001/EV-predict (wajib untuk penilaian)
 
 ### Kloning dan instalasi
 
 ```bash
-git clone https://github.com/REPLACE-ME/soluna.git
+git clone https://github.com/khalisanadya/Soluna
 cd soluna
 npm install
 python -m venv engine/.venv
