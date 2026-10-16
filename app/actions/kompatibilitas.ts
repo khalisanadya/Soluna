@@ -64,3 +64,17 @@ export async function runCompatibility(_prev: KompatState, fd: FormData): Promis
   // Penjelasan teks panjang tidak lagi ditampilkan; tidak diminta agar lebih cepat.
   return { values, hasil: res.data, penjelasan: null };
 }
+
+/** Hapus satu pemeriksaan dari riwayat. Langkah rencana desa dan pencocokan ikut memakai pemeriksaan terakhir yang tersisa. */
+export async function hapusKompatibilitas(fd: FormData) {
+  await requireAdmin();
+  const id = formString(fd, "id");
+  if (!id) return;
+  const r = await prisma.cekKompatibilitas.delete({ where: { id }, select: { bateraiId: true, rencanaId: true } }).catch(() => null);
+  revalidatePath("/kompatibilitas");
+  revalidatePath("/pencocokan");
+  revalidatePath("/riwayat");
+  revalidatePath("/dashboard");
+  if (r?.bateraiId) revalidatePath(`/baterai/${r.bateraiId}`);
+  if (r?.rencanaId) revalidatePath(`/perencana/${r.rencanaId}`);
+}

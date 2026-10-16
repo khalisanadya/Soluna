@@ -9,6 +9,7 @@ import type { HasilPencocokan, HasilRencana, HasilSiklus, StatusKompat } from ".
 const bateraiSiklusInclude = {
   bacaanSoh: { orderBy: { tanggal: "asc" } },
   penilaian: { orderBy: { createdAt: "desc" }, take: 1 },
+  pemasok: { select: { namaPerusahaan: true } },
 } as const;
 
 export function bateraiDinilaiUntukSiklus() {

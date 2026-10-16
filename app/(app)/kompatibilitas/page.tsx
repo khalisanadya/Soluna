@@ -6,6 +6,7 @@ import { num, tanggal } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { HasilKompatibilitas, HasilRencana } from "@/lib/types";
 import { CompatForm } from "./compat-form";
+import { HapusPemeriksaan } from "./hapus-pemeriksaan";
 
 export const metadata: Metadata = { title: "Kompatibilitas" };
 
@@ -95,7 +96,10 @@ export default async function KompatibilitasPage({ searchParams }: PageProps<"/k
                           {tanggal(r.createdAt)}
                         </span>
                       </span>
-                      <Badge tone={tone[hk.status]}>{hk.label}</Badge>
+                      <span className="flex shrink-0 items-center gap-1">
+                        <Badge tone={tone[hk.status]}>{hk.label}</Badge>
+                        <HapusPemeriksaan id={r.id} nama={r.baterai?.kode ?? r.rencana?.namaDesa ?? "manual"} waktu={tanggal(r.createdAt)} />
+                      </span>
                     </li>
                   );
                 })}
