@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Activity,
   ArrowLeftRight,
   Battery,
   Building2,
+  ChevronDown,
   CloudRain,
   HeartPulse,
   LayoutGrid,
@@ -126,6 +127,12 @@ const PEMASOK: Group[] = [
   },
 ];
 
+// Dashboard pemasok memuat ringkasan baterai & profil: menu ikut bagian yang sedang terlihat saat digulir.
+const BAGIAN_DASHBOARD = [
+  { id: "baterai-saya", href: "/baterai" },
+  { id: "profil-perusahaan", href: "/profil" },
+];
+
 const MOBILE_ADMIN = ["/dashboard", "/baterai", "/pencocokan", "/ketahanan"];
 const MOBILE_PEMASOK = ["/dashboard", "/baterai", "/profil"];
 
@@ -154,9 +161,32 @@ export function AppNav({ user }: { user: NavUser }) {
     window.addEventListener("scroll", cek, { passive: true });
     return () => window.removeEventListener("scroll", cek);
   }, []);
+  const spy = user.peran === "PEMASOK" && pathname === "/dashboard";
+  const [bagian, setBagian] = useState("/dashboard");
+  useEffect(() => {
+    if (!spy) return;
+    const cek = () => {
+      // Bagian aktif: bagian terakhir yang judulnya sudah melewati 40% tinggi layar; di dasar halaman, bagian terakhir.
+      const dasar = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      let aktif = "/dashboard";
+      for (const b of BAGIAN_DASHBOARD) {
+        const el = document.getElementById(b.id);
+        if (el && (dasar || el.getBoundingClientRect().top <= window.innerHeight * 0.4)) aktif = b.href;
+      }
+      setBagian(aktif);
+    };
+    cek();
+    window.addEventListener("scroll", cek, { passive: true });
+    window.addEventListener("resize", cek);
+    return () => {
+      window.removeEventListener("scroll", cek);
+      window.removeEventListener("resize", cek);
+    };
+  }, [spy]);
   const groups = user.peran === "ADMIN" ? ADMIN : PEMASOK;
   const items = groups.flatMap((g) => g.items);
   const hrefs = items.map((i) => i.href);
+  const aktif = (href: string) => (spy ? href === bagian : isActive(pathname, href, hrefs));
   const mobile = (user.peran === "ADMIN" ? MOBILE_ADMIN : MOBILE_PEMASOK).map(
     (h) => items.find((i) => i.href === h)!,
   );
@@ -192,7 +222,7 @@ export function AppNav({ user }: { user: NavUser }) {
               aria-label="Navigasi utama"
             >
               {items.map((it) => {
-                const active = isActive(pathname, it.href, hrefs);
+                const active = aktif(it.href);
                 return (
                   <Link
                     key={it.href}
@@ -216,25 +246,7 @@ export function AppNav({ user }: { user: NavUser }) {
                 );
               })}
             </nav>
-            <div className="flex items-center gap-2 justify-self-end">
-              <span
-                className="grid size-9 shrink-0 place-items-center rounded-full bg-sun-500 text-xs font-bold text-ink-950"
-                title={user.nama}
-              >
-                {initials}
-              </span>
-              <span className="hidden max-w-40 min-w-0 leading-tight xl:block">
-                <span className="block truncate text-sm font-semibold">
-                  {user.nama}
-                </span>
-                <span className="block truncate text-xs text-ink-500">
-                  {user.sub}
-                </span>
-              </span>
-              <LogoutButton className="grid size-9 place-items-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-ink-900">
-                <LogOut className="size-4" />
-              </LogoutButton>
-            </div>
+            <MenuPengguna user={user} initials={initials} />
           </div>
         </header>
       ) : (
@@ -255,7 +267,7 @@ export function AppNav({ user }: { user: NavUser }) {
                   )}
                   <ul className="space-y-0.5">
                     {g.items.map((it) => {
-                      const active = isActive(pathname, it.href, hrefs);
+                      const active = aktif(it.href);
                       return (
                         <li key={it.href}>
                           <Link
@@ -311,7 +323,7 @@ export function AppNav({ user }: { user: NavUser }) {
               aria-label="Navigasi utama"
             >
               {items.map((it) => {
-                const active = isActive(pathname, it.href, hrefs);
+                const active = aktif(it.href);
                 return (
                   <Link
                     key={it.href}
@@ -359,7 +371,7 @@ export function AppNav({ user }: { user: NavUser }) {
         aria-label="Navigasi ponsel"
       >
         {mobile.map((it) => {
-          const active = isActive(pathname, it.href, hrefs);
+          const active = aktif(it.href);
           return (
             <Link
               key={it.href}
@@ -426,7 +438,7 @@ export function AppNav({ user }: { user: NavUser }) {
                   onClick={() => setSheet(false)}
                   className={cn(
                     "flex flex-col items-center gap-1.5 rounded-2xl p-3 text-center text-xs font-medium",
-                    isActive(pathname, it.href, hrefs)
+                    aktif(it.href)
                       ? "bg-ink-900 text-white"
                       : "bg-ink-50 text-ink-700",
                   )}
@@ -480,5 +492,78 @@ export function LiveDot({ ok }: { ok: boolean }) {
       <Activity className="size-3.5" />
       Mesin hitung {ok ? "aktif" : "tidak aktif"}
     </span>
+  );
+}
+
+/** Blok pengguna di bilah atas: klik untuk membuka menu berisi tombol "Keluar". */
+function MenuPengguna({ user, initials }: { user: NavUser; initials: string }) {
+  const [buka, setBuka] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!buka) return;
+    // Dialog konfirmasi keluar berada di dalam ref, jadi kliknya tidak menutup menu.
+    const luar = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setBuka(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && !document.querySelector("dialog[open]") && setBuka(false);
+    document.addEventListener("pointerdown", luar);
+    document.addEventListener("keydown", esc);
+    // Halaman digulir → menu ditutup (kecuali dialog konfirmasi keluar sedang terbuka).
+    const gulir = () => !document.querySelector("dialog[open]") && setBuka(false);
+    window.addEventListener("scroll", gulir, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", luar);
+      document.removeEventListener("keydown", esc);
+      window.removeEventListener("scroll", gulir);
+    };
+  }, [buka]);
+
+  return (
+    <div ref={ref} className="relative justify-self-end">
+      <button
+        type="button"
+        onClick={() => setBuka((x) => !x)}
+        aria-haspopup="menu"
+        aria-expanded={buka}
+        className={cn(
+          "flex items-center gap-2 rounded-full p-1 text-left transition-colors hover:bg-ink-100 xl:pr-3",
+          buka && "bg-ink-100",
+        )}
+      >
+        <span
+          className="grid size-9 shrink-0 place-items-center rounded-full bg-sun-500 text-xs font-bold text-ink-950"
+          title={user.nama}
+        >
+          {initials}
+        </span>
+        <span className="hidden max-w-40 min-w-0 leading-tight xl:block">
+          <span className="block truncate text-sm font-semibold">
+            {user.nama}
+          </span>
+          <span className="block truncate text-xs text-ink-500">
+            {user.sub}
+          </span>
+        </span>
+        <ChevronDown
+          className={cn(
+            "hidden size-4 shrink-0 text-ink-400 transition-transform xl:block",
+            buka && "rotate-180",
+          )}
+        />
+      </button>
+      {buka && (
+        <div
+          role="menu"
+          className="absolute top-full right-0 mt-2 w-56 rounded-2xl bg-surface p-1.5 shadow-lift ring-1 ring-ink-200/60"
+        >
+          <div className="px-3 py-2 xl:hidden">
+            <p className="truncate text-sm font-semibold">{user.nama}</p>
+            <p className="truncate text-xs text-ink-500">{user.sub}</p>
+          </div>
+          <LogoutButton className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-flame-600 hover:bg-flame-50">
+            <LogOut className="size-4" />
+            Keluar
+          </LogoutButton>
+        </div>
+      )}
+    </div>
   );
 }

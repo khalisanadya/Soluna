@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Battery, PackagePlus as BatteryPlus, ChevronRight, ClipboardCheck, Clock3, Factory, SunMedium } from "lucide-react";
+import { ArrowRight, Battery, PackagePlus as BatteryPlus, Building2, ChevronRight, ClipboardCheck, Clock3, Factory, Mail, MapPin, Phone, SunMedium, UserRound, Warehouse } from "lucide-react";
 import { Badge, ButtonLink, Card, EmptyState, GradeBadge, SectionTitle, SohBadge, Stat } from "@/components/ui";
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/config";
@@ -98,44 +98,103 @@ async function PemasokDashboard({ user }: { user: CurrentUser }) {
         <Stat label="Diarahkan daur ulang" value={counts.D} icon={<Factory className="size-4" />} accent="flame" href="/baterai?grade=D" />
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <SectionTitle
-            title="Baterai terbaru"
-            hint="6 baterai terakhir yang Anda daftarkan"
-            action={
-              <Link href="/baterai" className="inline-flex items-center gap-1 text-sm font-semibold text-sun-700 hover:underline">
-                Semua <ArrowRight className="size-3.5" />
-              </Link>
-            }
-          />
-          {baterai.length ? (
-            <ul className="-mx-2 space-y-1">
-              {baterai.map((b) => (
-                <li key={b.id}>
-                  <Link href={`/baterai/${b.id}`} className="group flex items-center gap-3 rounded-2xl px-2 py-2.5 transition-colors hover:bg-ink-50">
-                    <GradeBadge grade={b.gradeTerakhir} />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span className="num text-sm font-semibold">{b.kode}</span>
-                        <span className="hidden text-xs text-ink-400 sm:inline">· {tanggal(b.createdAt)}</span>
+      {/* Halaman awal pemasok: ringkasan, baterai, dan profil dalam satu halaman. Menu navigasi membuka halaman lengkapnya. */}
+      <Bagian id="baterai-saya" judul="Baterai saya" href="/baterai" tautan="Kelola semua baterai">
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <SectionTitle
+              title="Baterai terbaru"
+              hint={total > baterai.length ? `${baterai.length} baterai terakhir dari ${total} yang Anda daftarkan` : `${total} baterai yang Anda daftarkan`}
+            />
+            {baterai.length ? (
+              <ul className="-mx-2 space-y-1">
+                {baterai.map((b) => (
+                  <li key={b.id}>
+                    <Link href={`/baterai/${b.id}`} className="group flex items-center gap-3 rounded-2xl px-2 py-2.5 transition-colors hover:bg-ink-50">
+                      <GradeBadge grade={b.gradeTerakhir} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="num text-sm font-semibold">{b.kode}</span>
+                          <span className="hidden text-xs text-ink-400 sm:inline">· {tanggal(b.createdAt)}</span>
+                        </span>
+                        <span className="block truncate text-sm text-ink-500">
+                          {b.merek} {b.model} · {b.jenisKimia} · {num(b.kapasitasAwalKwh)} kWh
+                        </span>
                       </span>
-                      <span className="block truncate text-sm text-ink-500">
-                        {b.merek} {b.model} · {b.jenisKimia} · {num(b.kapasitasAwalKwh)} kWh
-                      </span>
-                    </span>
-                    {b.status === "DINILAI" ? <SohBadge soh={b.sohTerakhir} tinggi={cfg.grade.A} rendah={cfg.grade.C} /> : <Badge tone="sun">Menunggu</Badge>}
-                    <ChevronRight className="size-4 shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5 group-hover:text-ink-600" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState title="Belum ada baterai" description="Tambahkan baterai pertama, lalu lakukan assessment untuk menerbitkan paspor." action={<ButtonLink href="/baterai/baru">Tambah baterai</ButtonLink>} />
-          )}
-        </Card>
-        <GradeDistribution counts={counts} />
-      </div>
+                      {b.status === "DINILAI" ? <SohBadge soh={b.sohTerakhir} tinggi={cfg.grade.A} rendah={cfg.grade.C} /> : <Badge tone="sun">Menunggu</Badge>}
+                      <ChevronRight className="size-4 shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5 group-hover:text-ink-600" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState title="Belum ada baterai" description="Tambahkan baterai pertama, lalu lakukan assessment untuk menerbitkan paspor." action={<ButtonLink href="/baterai/baru">Tambah baterai</ButtonLink>} />
+            )}
+          </Card>
+          <GradeDistribution counts={counts} />
+        </div>
+      </Bagian>
+
+      {pemasok && (
+        <Bagian id="profil-perusahaan" judul="Profil perusahaan" href="/profil" tautan="Lihat & ubah profil">
+          <Card>
+            <div className="flex items-center gap-3">
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-sun-100 text-sun-700">
+                <Building2 className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold text-ink-900">{pemasok.namaPerusahaan}</p>
+                <p className="text-xs text-ink-500">Bergabung {tanggal(pemasok.createdAt)}</p>
+              </div>
+            </div>
+            {pemasok.deskripsi && <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-ink-600">{pemasok.deskripsi}</p>}
+            <dl className="mt-4 grid gap-x-6 gap-y-3 border-t border-ink-100 pt-4 sm:grid-cols-2 xl:grid-cols-3">
+              <InfoProfil icon={UserRound} label="Penanggung jawab" nilai={pemasok.namaPenanggungJawab} />
+              <InfoProfil icon={Phone} label="Telepon" nilai={pemasok.telepon} />
+              <InfoProfil icon={Mail} label="Email" nilai={pemasok.emailPerusahaan} />
+              <InfoProfil icon={MapPin} label="Alamat" nilai={[pemasok.alamat, pemasok.kota, pemasok.provinsi].filter(Boolean).join(", ")} />
+              <InfoProfil
+                icon={Warehouse}
+                label="Lokasi penyimpanan"
+                nilai={
+                  pemasok.alamatPenyimpanan
+                    ? [pemasok.alamatPenyimpanan, pemasok.kotaPenyimpanan, pemasok.provinsiPenyimpanan].filter(Boolean).join(", ")
+                    : "Sama dengan alamat perusahaan"
+                }
+              />
+              <InfoProfil icon={Battery} label="Jenis baterai" nilai={pemasok.jenisBaterai || "—"} />
+            </dl>
+          </Card>
+        </Bagian>
+      )}
     </>
+  );
+}
+
+function Bagian({ id, judul, href, tautan, children }: { id: string; judul: string; href: string; tautan: string; children: React.ReactNode }) {
+  return (
+    <section id={id} aria-labelledby={`${id}-judul`} className="mt-8 scroll-mt-20">
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <h2 id={`${id}-judul`} className="text-lg font-semibold tracking-tight text-ink-900">
+          {judul}
+        </h2>
+        <Link href={href} className="inline-flex items-center gap-1 text-sm font-semibold text-sun-700 hover:underline">
+          {tautan} <ArrowRight className="size-3.5" />
+        </Link>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function InfoProfil({ icon: Icon, label, nilai }: { icon: React.ComponentType<{ className?: string }>; label: string; nilai: string }) {
+  return (
+    <div className="flex min-w-0 gap-2.5">
+      <Icon className="mt-0.5 size-4 shrink-0 text-ink-400" />
+      <div className="min-w-0">
+        <dt className="text-xs text-ink-500">{label}</dt>
+        <dd className="mt-0.5 text-sm break-words text-ink-900">{nilai}</dd>
+      </div>
+    </div>
   );
 }

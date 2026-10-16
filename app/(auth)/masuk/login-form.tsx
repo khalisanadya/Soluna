@@ -18,7 +18,7 @@ function validate(name: Name, v: Record<Name, string>) {
   if (name === "password") return v.password ? undefined : "Kata sandi wajib diisi.";
 }
 
-export function LoginForm({ demo }: { demo: { peran: string; email: string; password: string }[] }) {
+export function LoginForm() {
   const [state, action, pending] = useActionState(guardedLogin, undefined);
   const f = useFormFields<Name>({ email: "", password: "" }, validate, state);
   useFocusServerError(state, FIELDS);
@@ -105,27 +105,6 @@ export function LoginForm({ demo }: { demo: { peran: string; email: string; pass
         </p>
       </div>
 
-      {demo.length > 0 && (
-        <div className="mt-5 rounded-2xl border border-dashed border-ink-300 p-3.5 text-sm">
-          <p className="text-xs text-ink-500"><span className="font-semibold text-ink-800">Akun demo</span> · kata sandi <code className="num">{demo[0].password}</code> · klik untuk mengisi</p>
-          <div className="mt-2.5 grid grid-cols-2 gap-2">
-            {demo.map((d) => (
-              <button
-                key={d.email}
-                type="button"
-                onClick={() => {
-                  f.set("email", d.email);
-                  f.set("password", d.password);
-                }}
-                className="rounded-xl bg-ink-100/70 px-3 py-2 text-left transition hover:bg-ink-100 hover:ring-1 hover:ring-ink-300"
-              >
-                <span className="block text-xs text-ink-500">{d.peran}</span>
-                <span className="num block truncate font-medium text-ink-900">{d.email}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </>
   );
 }

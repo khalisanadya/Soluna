@@ -115,10 +115,13 @@ export function ConfigForm({ values, lokasi, versi }: { values: Record<string, s
           })()}
 
           {g.key === "cuaca" && edit && (
-            <p className={cn("mx-5 mb-5 -mt-1 rounded-lg px-3 py-2 text-xs", Math.abs(totalPorsi - 100) <= 0.5 ? "bg-leaf-50 text-leaf-700" : "bg-flame-50 text-flame-600")}>
-              Jumlah porsi beban: <span className="num font-semibold">{num(totalPorsi, 1)}%</span>
-              {Math.abs(totalPorsi - 100) > 0.5 && " — harus 100%"}
-            </p>
+            // Padding, bukan margin: margin bawah anak terakhir bocor keluar kartu (!p-0) dan terpotong sudutnya.
+            <div className="px-5 pb-5">
+              <p className={cn("rounded-lg px-3 py-2 text-xs", Math.abs(totalPorsi - 100) <= 0.5 ? "bg-leaf-50 text-leaf-700" : "bg-flame-50 text-flame-600")}>
+                Jumlah porsi beban: <span className="num font-semibold">{num(totalPorsi, 1)}%</span>
+                {Math.abs(totalPorsi - 100) > 0.5 && " — harus 100%"}
+              </p>
+            </div>
           )}
 
           {g.key === "surya" && lokasi.length > 0 && (

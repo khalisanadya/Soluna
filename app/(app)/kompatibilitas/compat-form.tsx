@@ -30,6 +30,7 @@ export function CompatForm({
   bateraiId,
   rencanaId,
   kunciRencana,
+  ikutRencana,
   dataBaterai,
   daftarBaterai,
   daftarRencana,
@@ -39,8 +40,10 @@ export function CompatForm({
   bateraiId: string;
   rencanaId: string;
   kunciRencana: boolean;
+  /** Rencana sudah punya baterai: pilihan baterai hanya dari rencana itu. */
+  ikutRencana: boolean;
   dataBaterai: { kode: string; tegangan: number | null; grade: string | null; soh: number | null; kapasitas: number; paket: number } | null;
-  daftarBaterai: { id: string; label: string; diRencana: boolean }[];
+  daftarBaterai: { id: string; label: string }[];
   daftarRencana: { id: string; label: string }[];
   riwayat: React.ReactNode;
 }) {
@@ -60,7 +63,8 @@ export function CompatForm({
   // Pilih baterai/rencana → muat ulang dengan data terisi otomatis.
   const pilihSumber = (k: "baterai" | "rencana", id: string) => {
     const q = new URLSearchParams();
-    const b = k === "baterai" ? id : bateraiId;
+    // Ganti rencana → baterai ikut rencana baru (atau kosong bila rencana belum punya baterai).
+    const b = k === "baterai" ? id : "";
     const r = k === "rencana" ? id : rencanaId;
     if (b) q.set("baterai", b);
     if (r) q.set("rencana", r);
@@ -160,33 +164,37 @@ export function CompatForm({
                 </Pilih>
               </Field>
             )}
-            <Field label="Baterai" htmlFor="pilih-baterai" required error={e.bateraiId}>
-              <Pilih id="pilih-baterai" value={bateraiId} onChange={(ev) => pilihSumber("baterai", ev.target.value)} className="h-10 text-sm">
-                <option value="" disabled>
-                  Pilih baterai…
-                </option>
-                {daftarBaterai.some((b) => b.diRencana) && (
-                  <optgroup label="Dipilih untuk rencana ini">
-                    {daftarBaterai
-                      .filter((b) => b.diRencana)
-                      .map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.label}
-                        </option>
-                      ))}
-                  </optgroup>
-                )}
-                <optgroup label={daftarBaterai.some((b) => b.diRencana) ? "Baterai lain" : "Baterai yang sudah dinilai"}>
-                  {daftarBaterai
-                    .filter((b) => !b.diRencana)
-                    .map((b) => (
+            {ikutRencana && daftarBaterai.length <= 1 ? (
+              <Field label="Baterai" required error={e.bateraiId} hint="Mengikuti baterai yang dipilih di rencana desa.">
+                <div className="flex h-10 items-center gap-2 rounded-xl bg-ink-50 px-3.5 text-sm ring-1 ring-ink-200">
+                  <Lock className="size-3.5 shrink-0 text-ink-400" />
+                  <span className={cn("truncate", daftarBaterai[0] ? "text-ink-800" : "text-ink-500")}>
+                    {daftarBaterai[0]?.label ?? "Baterai rencana ini belum dinilai"}
+                  </span>
+                </div>
+              </Field>
+            ) : (
+              <Field
+                label="Baterai"
+                htmlFor="pilih-baterai"
+                required
+                error={e.bateraiId}
+                hint={ikutRencana ? "Hanya baterai yang dipilih di rencana desa." : undefined}
+              >
+                <Pilih id="pilih-baterai" value={bateraiId} onChange={(ev) => pilihSumber("baterai", ev.target.value)} className="h-10 text-sm">
+                  <option value="" disabled>
+                    Pilih baterai…
+                  </option>
+                  <optgroup label={ikutRencana ? "Dipilih untuk rencana ini" : "Baterai yang sudah dinilai"}>
+                    {daftarBaterai.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.label}
                       </option>
                     ))}
-                </optgroup>
-              </Pilih>
-            </Field>
+                  </optgroup>
+                </Pilih>
+              </Field>
+            )}
           </div>
         </Card>
 

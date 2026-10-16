@@ -23,8 +23,11 @@ export async function runCompatibility(_prev: KompatState, fd: FormData): Promis
   if (!bateraiId) return { values, errors: { bateraiId: ["Pilih baterai yang akan diperiksa."] }, message: "Pilih baterai terlebih dahulu." };
   const [b, rencana] = await Promise.all([
     prisma.baterai.findUnique({ where: { id: bateraiId } }),
-    rencanaId ? prisma.rencanaDesa.findUnique({ where: { id: rencanaId }, select: { hasil: true } }) : null,
+    rencanaId ? prisma.rencanaDesa.findUnique({ where: { id: rencanaId }, select: { hasil: true, bateraiIds: true } }) : null,
   ]);
+  // Rencana yang sudah punya baterai hanya boleh diperiksa dengan baterai rencana itu.
+  if (rencana?.bateraiIds.length && !rencana.bateraiIds.includes(bateraiId))
+    return { values, errors: { bateraiId: ["Baterai harus salah satu yang dipilih di rencana desa."] }, message: "Baterai tidak termasuk rencana desa ini." };
   if (!b || b.sohTerakhir === null || !b.gradeTerakhir) return { values, errors: { bateraiId: ["Baterai belum dinilai."] }, message: "Baterai belum dinilai." };
   if (!b.teganganNominalV) return { values, errors: { bateraiId: ["Tegangan baterai belum diisi pemasok."] }, message: "Tegangan baterai belum diisi pemasok." };
   const raw = pick(fd, KOMPAT_FIELDS);
