@@ -12,7 +12,7 @@
 
 <div align="center">
 
-**[Tonton Video Demo](https://bit.ly/SolunaDemo)** · **[Repositori Model Baterai](https://github.com/REPLACE-ME/soluna-model)**
+**[Tonton Video Demo](https://youtu.be/HViFoydzQK0)** · **[Repositori Model Baterai](https://github.com/REPLACE-ME/soluna-model)**
 
 </div>
 
