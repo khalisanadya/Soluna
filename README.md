@@ -300,4 +300,4 @@ Menjalankan test case proposal (bagian 6.1, toleransi ±5%): kebutuhan malam ≈
 ---
 
 Dibuat untuk **Hackathon JOINTS x INSPIRE 2026**  
-**Tim The Blondes and Orang Tua** 
+**Tim The Blondes & Orang Tua** 
